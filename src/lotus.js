@@ -58,6 +58,7 @@ export function addInkOutline(material, palette, variant = 0) {
       outgoingLight += lotusGlint * lotusHighlights * (0.65 + 0.35 * lotusFacing);
       outgoingLight = mix(outgoingLight, lotusInk, lotusInkMask * 0.94);
       outgoingLight = mix(vec3(dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722))), outgoingLight, lotusSaturation);
+      outgoingLight = max(outgoingLight, vec3(0.0));
       #include <opaque_fragment>
     `);
   };
@@ -341,6 +342,7 @@ export function createLivingLotus(palette, renderer, worldScale = 1, { powerCont
   materials.forEach(material => { material.userData.saturation = saturation; });
   const plainColors = [calyx.material, heart.material, pollenMaterial].map(material => ({ material, color: material.color.clone() }));
   const wind = { direction: 0, strength: 0 };
+  let previousTime = null, motionTime = 0, lastPoseTime = -1, lastBloom = -1;
 
   return {
     group,
@@ -351,22 +353,31 @@ export function createLivingLotus(palette, renderer, worldScale = 1, { powerCont
         material.color.setRGB(gray, gray, gray).lerp(color, value);
       });
     },
-    update(time, bloom, energy = 1) {
-      wind.direction = .8 + Math.sin(time * .19) * .40;
-      wind.strength = .52 + Math.sin(time * .73) * .22 + Math.sin(time * 1.61 + .6) * .12;
-      for (const petal of petals) animatePetal(petal, time, bloom, wind);
-      group.position.y = WATER_LEVEL + .085 + Math.sin(time * .71) * .008;
-      group.rotation.y = Math.sin(time * .13) * .045;
-      heartLight.intensity = (.9 + Math.sin(time * 1.3) * .20) * worldScale ** 2;
-      heart.material.emissiveIntensity = .28 + Math.sin(time * 1.3) * .07;
+    update(time, bloom, energy = 1, restored = false) {
       const power = powerControlled ? clamp(energy, 0, 1) : 1;
-      if (powerControlled) {
-        materials.forEach(material => { material.emissiveIntensity = power * 1.8; });
-        heart.material.emissiveIntensity = power * 2.4;
-        pollenMaterial.emissiveIntensity = power * .5;
-        heartLight.intensity = power * 18 * worldScale ** 2;
+      const delta = previousTime === null ? Math.max(0, time) : Math.max(0, time - previousTime);
+      const rewind = previousTime !== null && time < previousTime;
+      previousTime = time;
+      if (!powerControlled) motionTime = time;
+      else if (power > 1e-8) motionTime = rewind ? time : motionTime + delta * (.2 + .8 * power);
+      if (motionTime !== lastPoseTime || bloom !== lastBloom) {
+        wind.direction = .8 + Math.sin(motionTime * .19) * .40;
+        wind.strength = .52 + Math.sin(motionTime * .73) * .22 + Math.sin(motionTime * 1.61 + .6) * .12;
+        for (const petal of petals) animatePetal(petal, motionTime, bloom, wind);
+        group.position.y = WATER_LEVEL + .085 + Math.sin(motionTime * .71) * .008;
+        group.rotation.y = Math.sin(motionTime * .13) * .045;
+        lastPoseTime = motionTime; lastBloom = bloom;
       }
-      magic.update(time, bloom, wind, power);
+      const glow = power * (restored ? 2.4 : 1);
+      heartLight.intensity = (.9 + Math.sin(motionTime * 1.3) * .20) * worldScale ** 2;
+      heart.material.emissiveIntensity = .28 + Math.sin(motionTime * 1.3) * .07;
+      if (powerControlled) {
+        materials.forEach(material => { material.emissiveIntensity = glow * 1.8; });
+        heart.material.emissiveIntensity = glow * 2.4;
+        pollenMaterial.emissiveIntensity = glow * .5;
+        heartLight.intensity = glow * 18 * worldScale ** 2;
+      }
+      magic.update(motionTime, bloom, wind, power, restored ? 2.4 : 1);
     },
     dispose() {
       textures.forEach(texture => texture.dispose());

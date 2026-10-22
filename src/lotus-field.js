@@ -84,8 +84,9 @@ export function createLotusField(renderer, textureCache) {
       if(changed || now-lastPose>=1000/30) {
         for(const slot of assignments) {
           const item=slot.item,power=item.energy/item.capacity;
+          const restored=item.energyRole==='taker' && power>=1-1e-8;
           slot.group.position.set(item.x,item.y,item.z); slot.group.scale.setScalar(item.diameter/LOTUS_REFERENCE_DIAMETER);
-          slot.flower.setSaturation(power); slot.flower.update(time,.85,power);
+          slot.flower.setSaturation(restored ? 1.15 : power); slot.flower.update(time,.85,power,restored);
         }
         lastPose=now;
       }
@@ -94,11 +95,13 @@ export function createLotusField(renderer, textureCache) {
         flowers.count=halos.count=Math.min(lotuses.length,MAX_WATER_LOTUSES);
         for(let i=0;i<flowers.count;i++) {
           const item=lotuses[i],power=item.energy/item.capacity, visible=item.visible && item.id !== heroId && !detailed.has(item.id);
+          const restored=item.energyRole==='taker' && power>=1-1e-8;
           dummy.position.set(item.x,item.y+.04,item.z); dummy.rotation.set(-Math.PI/2,0,0); dummy.scale.setScalar(visible?item.diameter:0);
           dummy.updateMatrix(); flowers.setMatrixAt(i,dummy.matrix);
           color.copy(gray).lerp(colors[item.palette],power); flowers.setColorAt(i,color);
+          if(restored) { color.offsetHSL(0,.15,.05); flowers.setColorAt(i,color); }
           dummy.position.y=item.y+.06; dummy.scale.setScalar(visible?item.diameter*1.5:0); dummy.updateMatrix(); halos.setMatrixAt(i,dummy.matrix);
-          halos.setColorAt(i,colors[item.palette]); powers.setX(i,visible?power:0);
+          halos.setColorAt(i,colors[item.palette]); powers.setX(i,visible?power*(restored?2.4:1):0);
         }
         flowers.instanceMatrix.needsUpdate=true; halos.instanceMatrix.needsUpdate=true;
         if(flowers.instanceColor) flowers.instanceColor.needsUpdate=true;

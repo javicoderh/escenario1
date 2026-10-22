@@ -30,7 +30,7 @@ export function parseLayout(value) {
     if (!item || !isValidPosition(item) || item.y !== 0 || typeof item.id !== 'string' || lotusIds.has(item.id)) return false;
     lotusIds.add(item.id); return true;
   }).slice(0, MAX_WATER_LOTUSES).map(createWaterLotus);
-  return { ...emptyLayout(), ...(value.zonesVersion === 1 ? { zonesVersion: 1 } : {}), lotuses, lotus: { ...value.lotus, visible: value.lotus.visible === true },
+  return { ...emptyLayout(), ...([1,2].includes(value.zonesVersion) ? { zonesVersion: value.zonesVersion } : {}), lotuses, lotus: { ...value.lotus, visible: value.lotus.visible === true },
     markers: value.markers.filter(marker => {
       if (!isValidPosition(marker) || typeof marker.id !== 'string' || ids.has(marker.id)) return false;
       ids.add(marker.id);

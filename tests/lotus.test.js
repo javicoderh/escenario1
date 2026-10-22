@@ -60,6 +60,20 @@ test('energy controls continuous aura opacity, saturation and light in both dire
         assert.equal(magic.visible,false);
       }
     }
+    lotus.update(2,.85,0);lotus.group.updateMatrixWorld(true);
+    const frozen=[];
+    lotus.group.traverse(object=>{if(object.isBone)frozen.push(object.rotation.toArray());});
+    const transform=lotus.group.matrixWorld.toArray();
+    lotus.update(20,.85,0);lotus.group.updateMatrixWorld(true);
+    const still=[];lotus.group.traverse(object=>{if(object.isBone)still.push(object.rotation.toArray());});
+    assert.deepEqual(still,frozen,'empty flowers stop all petal movement');
+    assert.deepEqual(lotus.group.matrixWorld.toArray(),transform,'empty flowers stop bobbing and turning');
+    lotus.update(21,.85,.5);lotus.group.updateMatrixWorld(true);
+    assert.notDeepEqual(lotus.group.matrixWorld.toArray(),transform,'charging revives movement');
+    lotus.update(22,.85,1,true);
+    lotus.group.traverse(object=>{
+      if(object.material?.uniforms?.uPower) assert.equal(object.material.uniforms.uPower.value,2.4,'restored receivers have a stronger aura');
+    });
   } finally {
     lotus.dispose();disposeMeshes(lotus.group);
     if(previous === undefined) delete globalThis.document; else globalThis.document=previous;

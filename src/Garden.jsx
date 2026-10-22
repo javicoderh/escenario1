@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createLivingLotus, createLotusTextureCache } from './lotus.js';
@@ -15,9 +15,13 @@ import { createElectricLink } from './electric-link.js';
 import { createWaterLotus, createEnergyState, stepEnergy, boatStats, BOAT_LEVELS } from './lotus-energy.js';
 import { createLotusField } from './lotus-field.js';
 import { LOTUS_REFERENCE_DIAMETER } from './lotus-scale.js';
+import { chargedBoatSpeed } from './boat-motion.js';
+import { pickWaterLotus } from './lotus-hover.js';
+import { LotusTooltip } from './LotusTooltip.jsx';
 
 export function Garden(props) {
   const host = useRef(), options = useRef(props); options.current = props;
+  const [hover, setHover] = useState(null);
   useEffect(() => {
     const el = host.current; let renderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' }); }
@@ -53,6 +57,34 @@ export function Garden(props) {
     let deckLotus = createBoatLotus(renderer, currentPalette, { textureCache, detail: 'medium' }); boat.lotusMount.add(deckLotus.group);
     const resonance = createEnergyState(), electricLink = createElectricLink(); scene.add(electricLink.group);
     let energyLayout, waterLotuses = [], fieldLotuses = [], saveElapsed = 0, detailBudget = 3;
+    const hoverRay = new THREE.Raycaster(), hoverMouse = new THREE.Vector2();
+    const pointer = { x: 0, y: 0, inside: false };
+    let lastHover = -Infinity, hoverKey = '';
+    const clearHover = () => { pointer.inside = false; hoverKey = ''; setHover(null); };
+    const moveHover = event => {
+      if (event.buttons) { clearHover(); return; }
+      pointer.x = event.clientX; pointer.y = event.clientY; pointer.inside = true;
+    };
+    renderer.domElement.addEventListener('pointermove', moveHover);
+    renderer.domElement.addEventListener('pointerleave', clearHover);
+    function updateHover(now, o) {
+      if (now - lastHover < 100) return;
+      lastHover = now;
+      if (!pointer.inside || o.suspended || document.pointerLockElement) {
+        if (hoverKey) { hoverKey = ''; setHover(null); }
+        return;
+      }
+      const rect = renderer.domElement.getBoundingClientRect();
+      hoverMouse.set((pointer.x - rect.left) / rect.width * 2 - 1, -(pointer.y - rect.top) / rect.height * 2 + 1);
+      hoverRay.setFromCamera(hoverMouse, camera);
+      const item = pickWaterLotus(hoverRay.ray, waterLotuses);
+      if (!item) { if (hoverKey) { hoverKey = ''; setHover(null); } return; }
+      const x = Math.max(8, Math.min(rect.width - 248, pointer.x - rect.left + 16));
+      const y = Math.max(8, Math.min(rect.height - 150, pointer.y - rect.top + 16));
+      const connected = resonance.linkId === item.id;
+      const key = `${item.id}:${item.energy.toFixed(1)}:${connected}:${Math.round(x)}:${Math.round(y)}`;
+      if (key !== hoverKey) { hoverKey = key; setHover({ lotus: { ...item }, connected, x, y }); }
+    }
     let savedProgress = {};
     try { savedProgress = JSON.parse(localStorage.getItem('flamming-lottus-energy-v1')) || {}; } catch {}
     if (Number.isFinite(savedProgress.delivered) && savedProgress.delivered >= 0) {
@@ -180,7 +212,8 @@ export function Garden(props) {
         fieldLotuses = waterLotuses;
         energyLayout = o.layout;
       }
-      sailing.update(dt, o.boatSpeed, o.playing && !o.suspended);
+      const effectiveSpeed = chargedBoatSpeed(o.boatSpeed, resonance.energy / boatStats(resonance).capacity);
+      sailing.update(dt, effectiveSpeed, o.playing && !o.suspended);
       const boatState = sailing.state;
       boat.group.position.x = boatState.position.x; boat.group.position.z = boatState.position.z;
       boat.group.rotation.y = boatState.heading;
@@ -215,8 +248,10 @@ export function Garden(props) {
         destinationMarker.position.copy(boatState.destination);
         destinationMarker.scale.setScalar(1 + Math.sin(t * 3) * .08);
       }
-      dust.rotation.y = t * .012;
-      leaves.children.forEach((leaf, index) => { leaf.position.y = WATER_LEVEL + .016 + Math.sin(t * .71 + index * .8) * .006; });
+      if (originPower > 1e-8) {
+        dust.rotation.y = t * .012;
+        leaves.children.forEach((leaf, index) => { leaf.position.y = WATER_LEVEL + .016 + Math.sin(t * .71 + index * .8) * .006; });
+      }
       atmosphere.update(o.night, dt, t);
       // A readable underwater atmosphere for the two submerged construction levels.
       if (camera.position.y < WATER_LEVEL) { scene.fog.color.set('#092c3c'); scene.fog.density = .00065; }
@@ -224,10 +259,11 @@ export function Garden(props) {
       if (controls.enabled) controls.update(dt); else if (editing) flight.update(dt, o.flightSpeed);
       guides.update(o, camera);
       renderer.info.reset(); renderer.render(scene, camera);
+      updateHover(now, o);
       if (now - lastHud > 250) {
         if (editing) o.onCameraPosition({ x: camera.position.x, y: camera.position.y, z: camera.position.z }); lastHud = now;
         if (navigating) o.onBoatState({ x: boatState.position.x, z: boatState.position.z, heading: boatState.heading,
-          speed: o.playing && navigating ? boatState.velocity.length() : 0, distance: boatState.distance,
+          speed: o.playing && navigating ? boatState.velocity.length() : 0, distance: boatState.distance, maxSpeed: effectiveSpeed,
           energy: { charge, units: resonance.energy, capacity: stats.capacity, level: resonance.level,
             delivered: resonance.delivered, restored: resonance.restored, nextThreshold: BOAT_LEVELS[resonance.level]?.threshold,
             connected: !!resonance.linkId, role: resonance.linkRole, name: resonance.linkName,
@@ -255,9 +291,11 @@ export function Garden(props) {
       cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', resetTiming);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
+      renderer.domElement.removeEventListener('pointermove', moveHover);
+      renderer.domElement.removeEventListener('pointerleave', clearHover);
       observer.disconnect(); sailing.dispose(); flight.dispose(); controls.dispose(); lotus.dispose(); deckLotus.dispose(); boat.dispose(); pond.dispose();
       disposeMeshes(scene); textureCache.dispose(); renderer.dispose(); el.removeChild(renderer.domElement); props.sceneRef.current = null;
     };
   }, []);
-  return <div ref={host} className="garden-canvas"/>;
+  return <><div ref={host} className="garden-canvas"/><LotusTooltip hover={hover}/></>;
 }

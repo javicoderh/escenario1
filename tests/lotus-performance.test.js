@@ -63,7 +63,7 @@ test('map rendering stays bounded while traveling and empty flowers remain visib
     field.update(lotuses,camera,now/1000,now+1000);
     assert.equal(field.detailedCount,0);
     const batches=field.group.children.filter(object=>object.isInstancedMesh);
-    assert.equal(batches.length,2);assert.ok(batches.every(batch=>batch.count===160));
+    assert.equal(batches.length,2);assert.ok(batches.every(batch=>batch.count===lotuses.length));
     const receiverIndex=lotuses.findIndex(item=>item.energyRole==='taker');
     const matrix=new THREE.Matrix4();batches[0].getMatrixAt(receiverIndex,matrix);
     assert.ok(new THREE.Vector3().setFromMatrixScale(matrix).length()>0);

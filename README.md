@@ -11,6 +11,7 @@ La cámara sigue al velero en tercera persona, desde atrás y ligeramente elevad
 - **Esc** o **Detener velero** detiene la navegación. **Centrar cámara** recupera la vista desde atrás.
 - **Volver junto al loto** devuelve al personaje al punto de partida. Las posiciones de los objetos del escenario se conservan; el velero comienza junto al loto al recargar.
 - Velocidad inicial: **4 m/s**, ajustable de 0,5 a 12 m/s. El personaje permanece en la superficie y dentro del radio del mapa.
+- La carga multiplica la velocidad base por `1 + carga/capacidad`: con la base de 4 m/s, el bote navega a 4 m/s vacío, 6 m/s al 50 % y 8 m/s lleno. Conserva movimiento sin energía y acelera/frena suavemente.
 - La pausa detiene el desplazamiento, la vela, la flotación y la estela; la cámara sigue disponible.
 
 La estela deposita muestras de espuma en el recorrido real, en lugar de moverlas junto al casco. Cada muestra se expande y se desvanece en 6,5 segundos. Sus pequeños destellos toman tonos azul plateado con luna llena y tonos cálidos al ocaso. La espuma, el velero y el farol comparten los reflejos del mar. El mapa de coordenadas sigue disponible en **Construir escenario**, con su cámara de vuelo libre.
@@ -32,20 +33,22 @@ El loto de cubierta empieza con 100 unidades de capacidad y 40 segundos de auton
 
 En **Construir escenario → Lotos de energía** puedes crear, seleccionar, editar y eliminar hasta 320 lotos adicionales al nivel del mar. Configura nombre, rol, tamaño, diámetro real, paleta, capacidad, energía inicial, transferencia por segundo, rango y regeneración. El mapa de navegación muestra los ocho sectores de 45°, sus nombres, las reservas y la posición del bote.
 
-El mundo se siembra automáticamente con 160 lotos (45 givers y 115 takers), además del loto de origen. La migración conserva los objetos existentes. La marca `zonesVersion` evita repetir la siembra o recrear lotos eliminados. Los modelos detallados se cargan cerca de la cámara; los lejanos usan una silueta simple que también refleja su energía.
+El mundo se siembra automáticamente con 60 lotos (52 givers y 8 takers), además del loto de origen. Cada zona tiene una misión: recoger energía de sus fuentes pequeñas y cargar completamente su único taker huge. La migración a `zonesVersion: 2` reemplaza la antigua siembra de 160 lotos y conserva los objetos manuales, los puntos de referencia y el progreso del bote. La marca evita repetir la siembra o recrear lotos eliminados.
 
-| Zona | Nombre | Givers | Takers |
+| Zona | Nombre | Givers | Objetivo huge |
 | --- | --- | ---: | ---: |
-| 1 | Cuna del Alba | 2 | 5 |
-| 2 | Jardín de Bruma | 3 | 7 |
-| 3 | Bahía de Seda | 4 | 9 |
-| 4 | Mareas de Ámbar | 5 | 12 |
-| 5 | Santuario Esmeralda | 6 | 15 |
-| 6 | Mar de los Colosos | 7 | 18 |
-| 7 | Abismo Estelar | 8 | 22 |
-| 8 | Corona del Loto | 10 | 27 |
+| 1 | Cuna del Alba | 3 | 160 u |
+| 2 | Jardín de Bruma | 4 | 280 u |
+| 3 | Bahía de Seda | 5 | 450 u |
+| 4 | Mareas de Ámbar | 6 | 650 u |
+| 5 | Santuario Esmeralda | 7 | 900 u |
+| 6 | Mar de los Colosos | 8 | 1200 u |
+| 7 | Abismo Estelar | 9 | 1600 u |
+| 8 | Corona del Loto | 10 | 2100 u |
 
-Cada sector aumenta la reserva total de sus fuentes y la demanda de sus receptores. Sus rutas parten cerca del centro y se extienden más al aumentar la dificultad. Los takers de las últimas zonas alcanzan 440 unidades de capacidad. Las zonas están abiertas: el nivel mejora la capacidad del bote, sin barreras de acceso.
+Cada sector aumenta la reserva de sus fuentes y la demanda de su objetivo. Los givers mezclan al menos tres tamaños y siempre son más pequeños que el taker. Sus reservas suman aproximadamente 1,8 veces la demanda del objetivo, dejando margen para los viajes. Los objetivos posteriores requieren varias entregas y conservan su carga parcial. Las zonas están abiertas, sin barreras de acceso.
+
+Al entrar o cruzar a una zona aparece su nombre en una etiqueta durante 3,4 segundos. La stamina está centrada en la parte inferior de la escena, también en pantalla completa y móvil. Al pasar el cursor sobre un loto se muestra su nombre, rol, tamaño, unidades actuales/capacidad y tasa: carga restante en givers y carga recibida en takers. La selección usa volúmenes simples a 10 Hz y funciona con modelos detallados e instancias.
 
 | Tamaño | Diámetro inicial | Capacidad inicial del taker |
 | --- | ---: | ---: |
@@ -56,11 +59,11 @@ Cada sector aumenta la reserva total de sus fuentes y la demanda de sus receptor
 | giant | 13 m | 100 u |
 | huge | 20 m | 160 u |
 
-Estos valores son editables. Los givers manuales empiezan llenos con 20 veces la capacidad de su tamaño, transfieren 10 u/s y regeneran 1 u/s mientras no son el enlace activo. Los takers manuales empiezan vacíos y reciben 5 u/s. El rango por defecto es 30 m. La siembra ajusta capacidades y tasas por zona, y usa un rango de 12 m en los takers.
+Estos valores son editables. Los givers manuales empiezan llenos con 20 veces la capacidad de su tamaño, transfieren 10 u/s y regeneran 1 u/s mientras no son el enlace activo. Los takers manuales empiezan vacíos y reciben 5 u/s. El rango por defecto es 30 m. La siembra ajusta capacidades y tasas por zona, y usa un rango de 24 m en los objetivos huge.
 
 Cada unidad transferida se descuenta del emisor. Solo existe un enlace activo: se mantiene mientras sea elegible; después se elige el más cercano. Un bote lleno puede pasar de una fuente a un taker cercano. Los lotos ocultos o fuera del nivel del mar no enlazan. Fuera de un enlace el bote consume capacidad/autonomía por segundo. La transferencia suspende ese consumo pasivo.
 
-En todos los lotos, la saturación, la emisión y la opacidad del aura siguen la fracción energía/capacidad. A cero quedan en blanco y negro, sin aura ni luz; al recibir energía recuperan gradualmente sus colores y efectos. Esto funciona tanto para la descarga de givers como para la carga de takers y la regeneración de fuentes. Los takers completos dejan de extraer y permanecen restaurados. La carga parcial se conserva. El loto de cubierta crece hasta una escala máxima de 1,60.
+En todos los lotos, la saturación, la emisión y la opacidad del aura siguen la fracción energía/capacidad. A cero quedan en blanco y negro, sin aura, luz ni movimiento de pétalos o flotación propia. Recibir energía reactiva gradualmente sus efectos y movimiento. Los takers completos dejan de extraer, aumentan la saturación y multiplican por 2,4 su emisión y aura para destacar el objetivo restaurado. La carga parcial se conserva. El loto de cubierta crece hasta una escala máxima de 1,60.
 
 Los temporizadores usan segundos activos independientes del ritmo de animación; pausa, modal y pestaña oculta suspenden la transferencia. El escenario se guarda en `flamming-lottus-world-v1` y el progreso en `flamming-lottus-energy-v1`, en localStorage. Recargar recupera ambos; editar atributos de un loto reinicia su reserva según la configuración. El JSON exportado contiene el escenario y las energías iniciales.
 

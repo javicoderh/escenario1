@@ -4,6 +4,7 @@ import { Garden } from './Garden.jsx';
 import { WorldEditor } from './WorldEditor.jsx';
 import { SailingPanel } from './SailingPanel.jsx';
 import { EnergyHUD } from './EnergyHUD.jsx';
+import { ZoneBanner } from './ZoneBanner.jsx';
 import { BOAT_SPEED, createBoatState } from './boat-motion.js';
 import { readLayout, STORAGE_KEY } from './world-layout.js';
 import { LOTUS_SCALE } from './lotus-scale.js';
@@ -80,6 +81,7 @@ function App(){
       <div className="viewer-top"><span><span className="status-dot"/> {editing?'ESCENARIO EN CONSTRUCCIÓN':navigating?'AL TIMÓN · ESPÍRITU DE SEDA':'JARDÍN EN VIVO'}</span><span className="edition">{editing?'R 1.000 m / Ø 2.000 m':navigating?'UN MAR / MIL CAMINOS':'SPECIMEN 001 / FLAMMING'}</span></div>
       <Garden {...{palette,bloom,speed,playing,night,sceneRef,editing,navigating,layout,selection,flightSpeed,boatSpeed}} suspended={info} onReady={setReady} onCameraPosition={setCameraPosition} onFlightStatus={setFlightStatus} onBoatState={setBoatState} onSailingStatus={setSailingStatus}/>
       {navigating && <EnergyHUD boatState={boatState}/>}
+      {navigating && <ZoneBanner boatState={boatState}/>}
       {ready===false&&<div className="webgl-error">Tu navegador no pudo iniciar WebGL. Activa la aceleración gráfica para explorar el escenario.</div>}
       {editing?<>
         <div className="camera-readout"><span>CÁMARA · METROS</span><b>X {cameraPosition.x.toFixed(1)} <i/> Y {cameraPosition.y.toFixed(1)} <i/> Z {cameraPosition.z.toFixed(1)}</b><small>{cameraPosition.y<0?'Bajo el nivel del mar':'Sobre el nivel del mar'}</small></div>

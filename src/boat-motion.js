@@ -5,6 +5,11 @@ export const BOAT_SPEED = 4;
 export const BOAT_RADIUS = 2.5;
 export const NAVIGATION_RADIUS = WORLD_RADIUS - BOAT_RADIUS;
 
+export function chargedBoatSpeed(baseSpeed, charge) {
+  const fraction = Number.isFinite(charge) ? Math.max(0, Math.min(1, charge)) : 0;
+  return baseSpeed * (1 + fraction);
+}
+
 export function clampSeaPosition(position) {
   const result = new THREE.Vector3(position.x, 0, position.z);
   if (result.length() > NAVIGATION_RADIUS) result.setLength(NAVIGATION_RADIUS);

@@ -199,8 +199,8 @@ export function createLotusMagic(palette, { detail = 'high' } = {}) {
 
   return {
     group,
-    update(elapsed, bloom, breeze, energy = 1) {
-      power.value = THREE.MathUtils.clamp(energy, 0, 1);
+    update(elapsed, bloom, breeze, energy = 1, boost = 1) {
+      power.value = THREE.MathUtils.clamp(energy, 0, 1) * boost;
       group.visible = power.value > 0;
       time.value = elapsed;
       wind.value.set(Math.sin(breeze.direction) * breeze.strength, Math.cos(breeze.direction) * breeze.strength);
