@@ -17,6 +17,7 @@ export function createLotusMagic(palette) {
   group.name = 'Nen aura and living spores';
   const colors = palette.map(color => new THREE.Color(color));
   const time = { value: 0 };
+  const power = { value: 1 };
   const wind = { value: new THREE.Vector2() };
   const shared = {
     transparent: true, depthWrite: false, depthTest: true,
@@ -26,7 +27,7 @@ export function createLotusMagic(palette) {
   // Irregular tongues and a broken silhouette, still in one translucent draw.
   const auraMaterial = new THREE.ShaderMaterial({
     ...shared,
-    uniforms: { uTime: time, uWind: wind, uColor: { value: colors[2] }, uLight: { value: colors[4] } },
+    uniforms: { uTime: time, uWind: wind, uPower: power, uColor: { value: colors[2] }, uLight: { value: colors[4] } },
     vertexShader: /* glsl */`
       uniform float uTime;
       uniform vec2 uWind;
@@ -53,6 +54,7 @@ export function createLotusMagic(palette) {
     `,
     fragmentShader: /* glsl */`
       uniform float uTime;
+      uniform float uPower;
       uniform vec3 uColor;
       uniform vec3 uLight;
       varying vec2 vAuraUv;
@@ -74,7 +76,7 @@ export function createLotusMagic(palette) {
         float firePresence = 0.24 + 0.76 * smoothstep(-0.45, 0.8, stream);
         float alpha = (fresnel * (0.09 + wisps * 0.27) * firePresence + wisps * 0.055 + veil * 0.006) * fade * breath;
         vec3 glow = mix(uColor, uLight, 0.2 + wisps * 0.6 + height * 0.15);
-        gl_FragColor = vec4(glow, alpha);
+        gl_FragColor = vec4(glow, alpha * uPower);
         #include <colorspace_fragment>
       }
     `,
@@ -88,7 +90,7 @@ export function createLotusMagic(palette) {
   // A faint pool of energy connects the aura to the flower's base.
   const halo = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
     ...shared,
-    uniforms: { uTime: time, uColor: { value: colors[3] } },
+    uniforms: { uTime: time, uPower: power, uColor: { value: colors[3] } },
     vertexShader: /* glsl */`
       varying vec2 vHaloUv;
       void main() {
@@ -98,6 +100,7 @@ export function createLotusMagic(palette) {
     `,
     fragmentShader: /* glsl */`
       uniform float uTime;
+      uniform float uPower;
       uniform vec3 uColor;
       varying vec2 vHaloUv;
       void main() {
@@ -106,7 +109,7 @@ export function createLotusMagic(palette) {
         float ringDistance = (radius - 0.72 - sin(uTime * 1.3) * 0.025) * 30.0;
         float ring = exp(-ringDistance * ringDistance) * 0.10;
         float alpha = (pool + ring) * (1.0 - smoothstep(0.85, 1.0, radius));
-        gl_FragColor = vec4(uColor, alpha);
+        gl_FragColor = vec4(uColor, alpha * uPower);
         #include <colorspace_fragment>
       }
     `,
@@ -141,7 +144,7 @@ export function createLotusMagic(palette) {
   geometry.setAttribute('aSporeColor', new THREE.InstancedBufferAttribute(new Float32Array(sporeColors), 3));
   const spores = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
     ...shared,
-    uniforms: { uTime: time, uWind: wind },
+    uniforms: { uTime: time, uWind: wind, uPower: power },
     vertexShader: /* glsl */`
       uniform float uTime;
       uniform vec2 uWind;
@@ -160,7 +163,9 @@ export function createLotusMagic(palette) {
         center.xz += vec2(sin(age * 11.0 + aSeed.z), cos(age * 9.0 + aSeed.z)) * age * 0.12;
         vec4 view = modelViewMatrix * vec4(center, 1.0);
         float breathe = 0.92 + 0.08 * sin(uTime * 1.8 + aSeed.z);
-        view.xy += position.xy * aSize * (0.65 + 0.35 * sin(age * 3.1415927)) * breathe;
+        // Billboard offsets are applied in view space, so include the parent's scale.
+        float worldScale = length(modelViewMatrix[0].xyz);
+        view.xy += position.xy * aSize * (0.65 + 0.35 * sin(age * 3.1415927)) * breathe * worldScale;
         gl_Position = projectionMatrix * view;
         vSporeUv = uv;
         vSporeColor = aSporeColor * (0.96 + 0.04 * sin(uTime * 0.55 + aSeed.z));
@@ -169,6 +174,7 @@ export function createLotusMagic(palette) {
       }
     `,
     fragmentShader: /* glsl */`
+      uniform float uPower;
       varying vec2 vSporeUv;
       varying vec3 vSporeColor;
       varying float vLife;
@@ -182,7 +188,7 @@ export function createLotusMagic(palette) {
         alpha *= 1.0 - smoothstep(0.75, 1.0, radius);
         vec3 coreColor = mix(vSporeColor, vec3(1.0), 0.28) * 1.75;
         vec3 color = mix(vSporeColor * 1.3, coreColor, core);
-        gl_FragColor = vec4(color, alpha);
+        gl_FragColor = vec4(color, alpha * uPower);
         #include <colorspace_fragment>
       }
     `,
@@ -193,7 +199,9 @@ export function createLotusMagic(palette) {
 
   return {
     group,
-    update(elapsed, bloom, breeze) {
+    update(elapsed, bloom, breeze, energy = 1) {
+      power.value = THREE.MathUtils.clamp(energy, 0, 1);
+      group.visible = power.value > 0;
       time.value = elapsed;
       wind.value.set(Math.sin(breeze.direction) * breeze.strength, Math.cos(breeze.direction) * breeze.strength);
       const breath = 1 + Math.sin(elapsed * 1.3) * .025;

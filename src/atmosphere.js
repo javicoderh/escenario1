@@ -27,9 +27,9 @@ export function createAtmosphere(scene, initialNight = true) {
     vertexShader: /* glsl */`
       varying vec3 vSkyDirection;
       void main() {
-        vec4 world = modelMatrix * vec4(position, 1.0);
-        vSkyDirection = world.xyz - cameraPosition;
-        vec4 clip = projectionMatrix * viewMatrix * world;
+        // A direction-only sky remains at infinity during kilometer-scale flight.
+        vSkyDirection = mat3(modelMatrix) * position;
+        vec4 clip = projectionMatrix * vec4(mat3(viewMatrix) * vSkyDirection, 1.0);
         // Keep the sky behind the scene, including the water's mirror camera.
         gl_Position = clip.xyww;
       }
@@ -133,7 +133,7 @@ export function createAtmosphere(scene, initialNight = true) {
   const nightFog = new THREE.Color('#172940');
   const duskSkyLight = new THREE.Color('#c5bbd8');
   const nightSkyLight = new THREE.Color('#a9c2ec');
-  scene.fog = new THREE.FogExp2(initialNight ? nightFog : duskFog, initialNight ? .014 : .018);
+  scene.fog = new THREE.FogExp2(initialNight ? nightFog : duskFog, .00028);
   function update(isNight, dt, elapsed = 0) {
     night.value = THREE.MathUtils.damp(night.value, isNight ? 1 : 0, 4, dt);
     time.value = elapsed;
@@ -143,7 +143,7 @@ export function createAtmosphere(scene, initialNight = true) {
     hemisphere.intensity = THREE.MathUtils.lerp(1.05, .62, night.value);
     hemisphere.color.copy(duskSkyLight).lerp(nightSkyLight, night.value);
     scene.fog.color.copy(duskFog).lerp(nightFog, night.value);
-    scene.fog.density = THREE.MathUtils.lerp(.018, .014, night.value);
+    scene.fog.density = THREE.MathUtils.lerp(.00035, .00028, night.value);
   }
   update(initialNight, 0);
   return {

@@ -19,7 +19,7 @@ function noise(x, y, seed) {
   return value - Math.floor(value);
 }
 
-function addInkOutline(material, palette, variant = 0) {
+export function addInkOutline(material, palette, variant = 0) {
   const ink = new THREE.Color(palette === 'moon' ? '#231c35' : '#301c28');
   const glint = new THREE.Color(palette === 'moon' ? '#e1eaff' : '#ffe4bc');
   // Paint the border in the existing draw call, so it follows the skinned mesh
@@ -63,7 +63,7 @@ function addInkOutline(material, palette, variant = 0) {
   return material;
 }
 
-function petalMaps(palette, variant, anisotropy) {
+export function petalMaps(palette, variant, anisotropy) {
   const width = 192, height = 384;
   const canvas = document.createElement('canvas');
   canvas.width = width; canvas.height = height;
@@ -229,7 +229,7 @@ function animatePetal(petal, time, bloom, wind) {
   petal.pivot.rotation.y = petal.angle + Math.sin(time * frequency * .41 + phase) * .045 + wind.strength * acrossWind * .018;
 }
 
-export function createLivingLotus(palette, renderer) {
+export function createLivingLotus(palette, renderer, worldScale = 1, { powerControlled = false } = {}) {
   const group = new THREE.Group();
   group.name = 'Flamming Lotus';
   const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -300,7 +300,7 @@ export function createLivingLotus(palette, renderer) {
     pollen.setMatrixAt(i, dummy.matrix);
   }
   group.add(pollen);
-  const heartLight = new THREE.PointLight(COLORS[palette][3], .65, 3, 2);
+  const heartLight = new THREE.PointLight(COLORS[palette][3], .65 * worldScale ** 2, 3 * worldScale, 2);
   heartLight.position.y = .9; group.add(heartLight);
 
   const magic = createLotusMagic(COLORS[palette]);
@@ -309,15 +309,22 @@ export function createLivingLotus(palette, renderer) {
 
   return {
     group,
-    update(time, bloom) {
+    update(time, bloom, energy = 1) {
       wind.direction = .8 + Math.sin(time * .19) * .40;
       wind.strength = .52 + Math.sin(time * .73) * .22 + Math.sin(time * 1.61 + .6) * .12;
       for (const petal of petals) animatePetal(petal, time, bloom, wind);
       group.position.y = WATER_LEVEL + .085 + Math.sin(time * .71) * .008;
       group.rotation.y = Math.sin(time * .13) * .045;
-      heartLight.intensity = .9 + Math.sin(time * 1.3) * .20;
+      heartLight.intensity = (.9 + Math.sin(time * 1.3) * .20) * worldScale ** 2;
       heart.material.emissiveIntensity = .28 + Math.sin(time * 1.3) * .07;
-      magic.update(time, bloom, wind);
+      const power = powerControlled ? clamp(energy, 0, 1) : 1;
+      if (powerControlled) {
+        materials.forEach(material => { material.emissiveIntensity = power * 1.8; });
+        heart.material.emissiveIntensity = power * 2.4;
+        pollenMaterial.emissiveIntensity = power * .5;
+        heartLight.intensity = power * 18 * worldScale ** 2;
+      }
+      magic.update(time, bloom, wind, power);
     },
     dispose() {
       textures.forEach(texture => texture.dispose());

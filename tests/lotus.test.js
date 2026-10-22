@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createLivingLotus, createPetalGeometry } from '../src/lotus.js';
+import { LOTUS_DIAMETER, LOTUS_SCALE } from '../src/lotus-scale.js';
 
 test('petal surface has finite normals and continuous edges', () => {
   const geometry = createPetalGeometry({ length: 3.8, width: .55, phase: 1.4 });
@@ -70,6 +71,24 @@ test('all petals deform independently and remain stable through bloom extremes',
         assert.ok(bounds.min.y > -.18, 'petals stay above the pond');
       }
     }
+    // Check the actual skinned petal vertices, not just the scale constant.
+    const anchor = new THREE.Group();
+    anchor.position.set(150, -15, 80);
+    anchor.scale.setScalar(LOTUS_SCALE);
+    anchor.add(lotus.group);
+    pose(0, 1); anchor.updateMatrixWorld(true);
+    const vertex = new THREE.Vector3(); let radius = 0;
+    for (const mesh of meshes) {
+      mesh.skeleton.update();
+      for (let i = 0; i < mesh.geometry.attributes.position.count; i++) {
+        mesh.getVertexPosition(i, vertex).applyMatrix4(mesh.matrixWorld).sub(anchor.position);
+        radius = Math.max(radius, Math.hypot(vertex.x, vertex.z));
+      }
+    }
+    assert.ok(Math.abs(radius * 2 - LOTUS_DIAMETER) < 1e-6, 'open flower reference diameter is 2 meters');
+    assert.equal(LOTUS_DIAMETER, 2);
+    pose(3, .5);
+    assert.deepEqual(anchor.position.toArray(), [150, -15, 80], 'animation preserves the world coordinate');
   } finally {
     lotus.dispose();
     const geometries = new Set(), materials = new Set();

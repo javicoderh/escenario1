@@ -1,0 +1,119 @@
+.workspace-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.workspace-toolbar>span{font-size:9px;color:#7eaaa9;letter-spacing:1.4px}
+.mode-switch{display:flex;gap:4px;border:1px solid #a7c9c323;padding:4px;border-radius:9px;background:#131e1c}
+.mode-switch button{font-size:12px;padding:10px 17px;border-radius:6px;color:#91a5a0}
+.mode-switch button[aria-pressed=true]{background:#cbd8b4;color:#1c302a}
+.editor-mode{max-width:1900px;padding:0 3%}
+.editor-mode .intro{padding:28px 0 24px}
+.editor-mode h1{font-size:clamp(30px,3vw,43px);margin:12px 0}
+.editor-mode .workspace{grid-template-columns:minmax(0,1fr) 340px;align-items:start;overflow:clip}
+.editor-mode .viewer{height:calc(100vh - 290px);min-height:580px;max-height:1000px;position:sticky;top:12px}
+.editor-mode .viewer:fullscreen{position:relative;top:0;height:100vh;max-height:none}
+.editor-mode .viewer:after{background:radial-gradient(ellipse,transparent 60%,#06191c44)}
+.editor-mode .viewer-tools{bottom:94px}
+.viewer-top,.camera-readout,.flight-help,.flower-caption,.interaction{pointer-events:none}
+.garden-canvas canvas:focus-visible{outline:2px solid #9acbd0;outline-offset:-3px}
+.camera-readout{position:absolute;left:23px;bottom:100px;z-index:2;display:flex;flex-direction:column;gap:8px;text-shadow:0 1px 5px #000}
+.camera-readout>span{font-size:8px;letter-spacing:1.5px;color:#9fbfbd}
+.camera-readout b{font-family:ui-monospace,Consolas,monospace;font-size:12px;font-weight:400}
+.camera-readout i{display:inline-block;margin:0 9px;height:10px;border-left:1px solid #b2d4cf44}
+.camera-readout small{font-size:10px;color:#a1b6b1}
+.flight-toolbar{position:absolute;z-index:3;left:23px;top:55px;display:flex;gap:8px;flex-wrap:wrap}
+.flight-toolbar button{background:#102c30df;border:1px solid #94b9b744;border-radius:6px;padding:10px 12px;font-size:11px;color:#d4e6df}
+.flight-toolbar button:hover{background:#294b4d}
+.flight-help{position:absolute;left:23px;right:23px;bottom:24px;z-index:2;display:flex;flex-direction:column;gap:7px;font-size:11px;color:#d8e7dd;text-shadow:0 1px 5px #000}
+.flight-help small{font-size:10px;color:#a1bab8}
+.world-editor{background:#141f20;border-left:1px solid #b6cfc51c;padding:23px;min-width:0;color:#d7e1d6}
+.editor-heading{display:flex;align-items:start;gap:10px}
+.editor-heading .eyebrow{font-size:8px;color:#94beba;letter-spacing:1.6px}
+.editor-heading h2{font-family:'Playfair Display',Georgia,serif;font-size:22px;line-height:1.3;font-weight:400;margin:10px 0}
+.meter-tag{font-size:8px;white-space:nowrap;padding:5px 6px;border:1px solid #a3cac52b;border-radius:4px;color:#9abdb7}
+.editor-description{font-size:11px;line-height:1.8;color:#91a8a3;margin:0 0 12px}
+.world-map{background:#0d181d;border:1px solid #9bcbcf1a;border-radius:9px;padding:5px;margin-bottom:20px;text-align:center}
+.world-map svg{width:100%;max-height:240px;display:block;cursor:crosshair;touch-action:manipulation}
+.world-map text{font-family:ui-monospace,monospace;font-size:7px;fill:#8cb7b9}
+.world-map text.map-lotus{fill:#f5af80;font-size:13px}
+.world-map>span{display:block;font-size:9px;color:#86a3a1;padding:0 0 10px}
+.level-selector{margin:0 0 16px;padding:0;border:0;display:flex;flex-direction:column;gap:4px}
+.level-selector legend{font-size:10px;color:#a2bdb4;margin-bottom:12px}
+.level-selector button{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:11px;background:#0e191c;border:1px solid transparent;border-radius:5px;color:#8ba5a1}
+.level-selector button:before{content:'';width:6px;height:6px;border-radius:50%;background:var(--level-color);margin-right:9px}
+.level-selector button span{margin-right:auto}
+.level-selector button b{font-family:ui-monospace,monospace;font-size:10px;font-weight:400;color:var(--level-color)}
+.level-selector button.selected{border-color:var(--level-color);background:#233739;color:#e5eee4}
+.coordinate-inputs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:14px 0}
+.coordinate-inputs label{font-size:10px;color:#b7cec6}
+.coordinate-inputs label>span{float:right;color:#6e8b86}
+.coordinate-inputs input,.editor-field>input:not([type=range]){display:block;margin-top:7px;width:100%;border:1px solid #a0c7c52b;border-radius:5px;background:#0c171b;color:#e2ebdf;padding:10px 7px;font:12px ui-monospace,monospace}
+.coordinate-inputs input:read-only{color:#a8c9c4;background:#1b2b2d}
+.world-editor input:focus-visible{outline:2px solid #a8d7b0;outline-offset:2px}
+.editor-actions{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
+.editor-actions button{flex:1;min-width:100px;padding:10px 7px;background:#243c3a;border:1px solid #a4c9bb26;border-radius:5px;font-size:10px;color:#d0e3d7}
+.editor-actions button:hover{background:#34514b}
+.world-editor button:disabled{opacity:.4;cursor:not-allowed}
+.editor-check{display:flex;gap:8px;align-items:center;font-size:10px;color:#b1c7be;margin-top:16px}
+.editor-check input{accent-color:#bdd1ab}
+.editor-hint{font-size:10px;line-height:1.7;color:#819d96;margin:10px 0 0}
+.editor-error{font-size:11px;line-height:1.5;color:#ffc5ab}
+.editor-section{border-top:1px solid #a2c0b91c;margin-top:18px;padding-top:18px}
+.editor-field{display:block;font-size:11px;color:#b2c8be}
+.editor-field>span{float:right;font:10px ui-monospace,monospace;color:#c5dcb7}
+.editor-field input[type=range]{accent-color:#c5dcb7;background:#3b5952;margin:18px 0 0}
+.editor-section-title{display:flex;justify-content:space-between;font-size:12px}
+.editor-section-title>span{font:10px ui-monospace,monospace;color:#8fac9f}
+.text-action{font-size:10px;padding:12px 0 0;color:#c0d5af}
+.anchor-list{padding:0;list-style:none;max-height:180px;overflow:auto;margin:14px 0 0}
+.anchor-list li{display:flex;border-bottom:1px solid #9abbab22}
+.anchor-list li.selected{background:#284039}
+.anchor-list li>button:first-child{display:flex;flex-direction:column;gap:5px;flex:1;text-align:left;padding:9px;min-width:0}
+.anchor-list strong{font-size:11px;font-weight:400;overflow-wrap:anywhere}
+.anchor-list span{font:9px ui-monospace,monospace;color:#89aa9e}
+.anchor-list li>button:last-child{font-size:20px;padding:8px;color:#a4bbad}
+.world-editor>.capture{margin-top:20px}
+.storage-status{font-size:9px;line-height:1.6;color:#87a691;text-align:center;margin:10px 0 0}
+.navigation-mode{max-width:1900px;padding:0 3%}
+.navigation-mode .intro{padding:28px 0 24px}
+.navigation-mode h1{font-size:clamp(30px,3vw,43px);margin:12px 0}
+.navigation-mode .workspace{grid-template-columns:minmax(0,1fr) 310px;align-items:start}
+.navigation-mode .viewer{height:calc(100vh - 290px);min-height:640px;max-height:1000px;position:sticky;top:12px}
+.navigation-mode .viewer:fullscreen{position:relative;top:0;height:100vh;max-height:none}
+.navigation-mode .viewer-tools{bottom:100px}
+.sailing-panel{padding:26px 23px;background:#152121;border-left:1px solid #b6cfc51c;min-width:0}
+.sailing-panel>.eyebrow{font-size:8px;letter-spacing:1.8px;color:#9db9a4}
+.sailing-panel h2{font-family:'Playfair Display',Georgia,serif;font-size:29px;font-weight:400;color:#d4dcba;margin:12px 0}
+.sailing-description{font-size:11px;line-height:1.8;color:#8fa99f;margin:0}
+.sailing-compass{position:relative;margin:24px auto 22px;border:1px solid #a3c5b72b;border-radius:50%;height:122px;width:122px;display:flex;flex-direction:column;justify-content:center;align-items:center;background:radial-gradient(circle,#203b35,#10201e)}
+.sailing-compass>span{position:absolute;top:8px;font:9px ui-monospace,monospace;color:#c4d5b4}
+.sailing-compass>div{position:absolute;font-size:96px;line-height:1;color:#afc8a033}
+.sailing-compass b{z-index:1;font:22px 'Playfair Display',serif;color:#dbe3bf}
+.sailing-compass small{z-index:1;font:9px ui-monospace,monospace;color:#8eafa1;margin-top:7px}
+.boat-coordinates{display:grid;grid-template-columns:1fr 1fr;gap:17px 12px;border-block:1px solid #a2c0b91c;padding:19px 0}
+.boat-coordinates>div{display:flex;flex-direction:column;gap:7px}
+.boat-coordinates span{font-size:7px;letter-spacing:1px;color:#7da494}
+.boat-coordinates b{font:14px ui-monospace,monospace;font-weight:400;color:#d4dfc9}
+.boat-coordinates small{font-size:9px;color:#85a596}
+.sailing-destination{margin:18px 0;display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:6px;border:1px solid #c0d3a71c;background:#0e1c1b}
+.sailing-destination>span{font-size:7px;letter-spacing:1.1px;color:#94b3a0}
+.sailing-destination strong{font:13px ui-monospace,monospace;font-weight:400;color:#d3debe}
+.sailing-destination small{font-size:10px;color:#87a899;line-height:1.6}
+.sailing-instructions{text-align:center;margin:22px 0 12px;color:#96afa3;font-size:10px;line-height:1.9}
+.sailing-instructions kbd{display:inline-grid;place-items:center;width:25px;height:25px;margin:2px;border:1px solid #9dbb9f33;border-bottom-width:2px;border-radius:4px;color:#becdb2;background:#1c3029;font:10px ui-monospace,monospace}
+.sailing-panel>.capture{margin-top:18px}
+.resonance-readout{margin-top:18px;padding:14px;border:1px solid #a2c0b927;border-radius:7px;background:#0e1b1d}
+.resonance-readout>div:first-child{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.resonance-readout>div>span{font-size:8px;letter-spacing:1px;color:#a4bda6}
+.resonance-readout b{font:13px ui-monospace,monospace;color:#c8d4b6}
+.resonance-readout p{font-size:11px;color:#a9b9a2;margin:11px 0}
+.resonance-readout small{display:block;font-size:9px;line-height:1.8;color:#839e93;margin-top:6px}
+.resonance-readout.connected{border-color:#e2bd7866;background:linear-gradient(135deg,#20332b,#172323)}
+.resonance-readout.connected p,.resonance-readout.connected b{color:#f5d99f}
+.energy-track{height:5px;border-radius:4px;background:#364739;overflow:hidden}
+.energy-track>span{display:block;height:100%;background:linear-gradient(90deg,#eaa55b,#ffe3a0);box-shadow:0 0 10px #ffb45699}
+.sailing-hud{position:absolute;left:26px;bottom:112px;display:flex;flex-direction:column;gap:7px;z-index:2;pointer-events:none;text-shadow:0 1px 6px #091c22}
+.sailing-hud>span{font-size:8px;letter-spacing:2px;color:#c1d4b7}
+.sailing-hud>b{font:36px 'Playfair Display',serif;font-weight:400;color:#e2e8cf}
+.sailing-hud small{font:10px ui-monospace,monospace;color:#acc2b2}
+.sailing-hud p{font-size:10px;color:#94b1a4;margin:0}
+@media(max-width:760px){.navigation-mode .workspace{grid-template-columns:1fr}.navigation-mode .viewer{position:relative;top:0;height:560px;min-height:460px}.sailing-panel{border-left:0;border-top:1px solid #a3c5b722}.mode-switch button{padding:10px 8px;font-size:10px}.navigation-mode .intro{padding-top:24px}.navigation-mode h1{font-size:33px}.navigation-mode .flight-help small{font-size:8px}}
+@media(max-width:1050px){.editor-mode .workspace{grid-template-columns:minmax(0,1fr) 300px}.world-editor{padding:18px}.camera-readout b{font-size:10px}.camera-readout i{margin:0 5px}.flight-help{font-size:10px}.flight-help small{font-size:9px}}
+@media(max-width:760px){.editor-mode .workspace{grid-template-columns:1fr}.editor-mode .viewer{position:relative;top:0;height:560px;min-height:460px}.world-editor{border-left:0;border-top:1px solid #b6cfc51c}.world-map svg{max-height:280px}.workspace-toolbar>span{display:none}.mode-switch{width:100%}.mode-switch button{flex:1;padding:10px}.camera-readout{left:18px}.flight-toolbar{left:18px}.flight-help{left:18px;right:18px}.editor-mode .intro{padding-top:24px}.editor-mode h1{font-size:33px}}
