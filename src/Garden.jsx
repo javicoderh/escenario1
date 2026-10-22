@@ -12,7 +12,8 @@ import { createBoatWake } from './boat-wake.js';
 import { createSailingControls } from './sailing-controls.js';
 import { createBoatLotus } from './boat-lotus.js';
 import { createElectricLink } from './electric-link.js';
-import { createResonanceState, nearestWaterLotus, stepResonance, POWER_TRANSITION_SECONDS, RESONANCE_RANGE } from './lotus-resonance.js';
+import { createWaterLotus, createEnergyState, stepEnergy, boatStats, BOAT_LEVELS } from './lotus-energy.js';
+import { LOTUS_REFERENCE_DIAMETER } from './lotus-scale.js';
 
 export function Garden(props) {
   const host = useRef(), options = useRef(props); options.current = props;
@@ -38,10 +39,26 @@ export function Garden(props) {
     lotusAnchor.userData = { entityId: 'water-lotus', entityType: 'lotus', role: 'water-lotus' };
     lotusAnchor.scale.setScalar(LOTUS_SCALE);
     let currentPalette = options.current.palette;
-    let lotus = createLivingLotus(currentPalette, renderer, LOTUS_SCALE); lotusAnchor.add(lotus.group);
+    let lotus = createLivingLotus(currentPalette, renderer, LOTUS_SCALE, { powerControlled: true }); lotusAnchor.add(lotus.group);
     let boat = createSailboat(renderer, currentPalette); scene.add(boat.group);
     let deckLotus = createBoatLotus(renderer, currentPalette); boat.lotusMount.add(deckLotus.group);
-    const resonance = createResonanceState(), electricLink = createElectricLink(); scene.add(electricLink.group);
+    const resonance = createEnergyState(), electricLink = createElectricLink(); scene.add(electricLink.group);
+    const waterEntities = new Map();
+    let energyLayout, waterLotuses = [], saveElapsed = 0;
+    let savedProgress = {};
+    try { savedProgress = JSON.parse(localStorage.getItem('flamming-lottus-energy-v1')) || {}; } catch {}
+    if (Number.isFinite(savedProgress.delivered) && savedProgress.delivered >= 0) {
+      resonance.delivered = Math.min(savedProgress.delivered, 1e9);
+      resonance.level = BOAT_LEVELS.reduce((level, item, index) => resonance.delivered >= item.threshold ? index+1 : level, 1);
+      resonance.energy = Math.max(0, Math.min(boatStats(resonance).capacity, Number(savedProgress.energy) || 0));
+      resonance.restored = Math.max(0, Math.floor(Number(savedProgress.restored) || 0));
+    }
+    function saveEnergy() {
+      try { localStorage.setItem('flamming-lottus-energy-v1', JSON.stringify({ energy: resonance.energy,
+        delivered: resonance.delivered, restored: resonance.restored,
+        lotuses: Object.fromEntries(waterLotuses.map(item => [item.id, { energy: item.energy, signature: item.signature }])) })); } catch {}
+    }
+    window.addEventListener('pagehide', saveEnergy);
     const linkSource = new THREE.Vector3(), linkTarget = new THREE.Vector3();
     const wake = createBoatWake(); scene.add(wake.mesh);
     const destinationMarker = new THREE.Group(); scene.add(destinationMarker);
@@ -119,7 +136,7 @@ export function Garden(props) {
       sailing.setEnabled(navigating && !o.suspended);
       if (o.palette !== currentPalette) {
         lotus.dispose(); disposeMeshes(lotus.group); lotusAnchor.remove(lotus.group);
-        currentPalette = o.palette; lotus = createLivingLotus(currentPalette, renderer, LOTUS_SCALE); lotusAnchor.add(lotus.group); pond.invalidate();
+        energyLayout = null; currentPalette = o.palette; lotus = createLivingLotus(currentPalette, renderer, LOTUS_SCALE, { powerControlled: true }); lotusAnchor.add(lotus.group); pond.invalidate();
         boat.lotusMount.remove(deckLotus.group); deckLotus.dispose(); disposeMeshes(deckLotus.group);
         boat.dispose(); disposeMeshes(boat.group); scene.remove(boat.group);
         boat = createSailboat(renderer, currentPalette); scene.add(boat.group);
@@ -129,23 +146,80 @@ export function Garden(props) {
       opening = THREE.MathUtils.damp(opening, o.bloom, 5, dt);
       lotusAnchor.position.set(o.layout.lotus.x, o.layout.lotus.y, o.layout.lotus.z);
       lotusAnchor.visible = o.layout.lotus.visible;
-      if (lotusAnchor.visible) lotus.update(t, opening);
-      sailing.update(dt, o.boatSpeed, o.playing);
+      if (energyLayout !== o.layout) {
+        const definitions = [{ ...createWaterLotus({ ...o.layout.lotus, id: 'water-lotus', name: 'Loto de origen', palette: currentPalette }), y: o.layout.lotus.y }, ...(o.layout.lotuses || [])];
+        const previous = new Map(waterLotuses.map(item => [item.id, item]));
+        waterLotuses = definitions.map(definition => {
+          const signature = JSON.stringify(definition);
+          const old = previous.get(definition.id) || savedProgress.lotuses?.[definition.id];
+          return { ...definition, signature, energy: old?.signature === signature && Number.isFinite(old.energy)
+            ? Math.max(0, Math.min(definition.capacity, old.energy)) : definition.energy };
+        });
+        for (const [id, entity] of waterEntities) {
+          if (!definitions.some(item => item.id === id && JSON.stringify(item) === entity.signature)) {
+            entity.flower?.dispose(); disposeMeshes(entity.group); scene.remove(entity.group); waterEntities.delete(id);
+          }
+        }
+        for (const definition of definitions.slice(1)) if (!waterEntities.has(definition.id)) {
+          const scale = definition.diameter / LOTUS_REFERENCE_DIAMETER;
+          const group = new THREE.Group(); group.scale.setScalar(scale); scene.add(group);
+          const shape = new THREE.Shape();
+          for (let i = 0; i <= 36; i++) {
+            const angle = i / 36 * Math.PI * 2, radius = i % 2 ? 1.3 : 3.1;
+            if (!i) shape.moveTo(Math.cos(angle)*radius, Math.sin(angle)*radius);
+            else shape.lineTo(Math.cos(angle)*radius, Math.sin(angle)*radius);
+          }
+          const proxy = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshStandardMaterial({
+            side: THREE.DoubleSide, roughness: .6, emissive: '#f9b65c', emissiveIntensity: 0,
+          }));
+          proxy.rotation.x = -Math.PI/2; proxy.position.y = .1; group.add(proxy);
+          waterEntities.set(definition.id, { group, flower: null, proxy, scale, signature: JSON.stringify(definition) });
+        }
+        energyLayout = o.layout;
+      }
+      sailing.update(dt, o.boatSpeed, o.playing && !o.suspended);
       const boatState = sailing.state;
       boat.group.position.x = boatState.position.x; boat.group.position.z = boatState.position.z;
       boat.group.rotation.y = boatState.heading;
       boat.update(t, boatState.velocity.length());
-      const sources = [{ id: 'water-lotus', role: 'water-lotus', visible: o.layout.lotus.visible,
-        position: { x: o.layout.lotus.x, y: o.layout.lotus.y, z: o.layout.lotus.z } }];
-      const source = nearestWaterLotus(boatState.position, sources);
-      // Power is measured in real active seconds, independently of animation
-      // speed and the frame-delta cap used for physical motion.
-      stepResonance(resonance, o.playing && !o.suspended ? Math.max(0, elapsed) : 0, source);
-      deckLotus.update(t, resonance.charge); boat.setEnergy(resonance.charge);
+      const activeSeconds = o.playing && !o.suspended ? Math.max(0, elapsed) : 0;
+      stepEnergy(resonance, waterLotuses, boatState.position, activeSeconds);
+      const stats = boatStats(resonance), charge = resonance.energy / stats.capacity;
+      for (const item of waterLotuses) {
+        const entity = item.id === 'water-lotus' ? { flower: lotus, group: lotusAnchor } : waterEntities.get(item.id);
+        entity.group.position.set(item.x, item.y, item.z); entity.group.visible = item.visible;
+        const fraction = item.energy / item.capacity;
+        if (entity.proxy) {
+          const distance = camera.position.distanceTo(entity.group.position);
+          if (item.visible && distance < 110 && !entity.flower) {
+            entity.flower = createLivingLotus(item.palette, renderer, entity.scale, { powerControlled: true });
+            entity.group.add(entity.flower.group);
+          } else if ((!item.visible || distance > 145) && entity.flower) {
+            entity.flower.dispose(); disposeMeshes(entity.flower.group); entity.group.remove(entity.flower.group); entity.flower = null;
+          }
+          entity.proxy.visible = !entity.flower;
+          entity.proxy.material.color.set('#b0b0b0').lerp(new THREE.Color({ ember: '#ef633e', sakura: '#eca3bd', moon: '#b7b1ee' }[item.palette]), fraction);
+          entity.proxy.material.emissiveIntensity = fraction * .8;
+        }
+        if (entity.flower) {
+          entity.flower.setSaturation(fraction);
+          if (item.visible) entity.flower.update(t, item.id === 'water-lotus' ? opening : .85, fraction);
+        }
+        if (item.id === 'water-lotus') { dust.material.opacity = fraction * .65; }
+      }
+      const targetScale = stats.scale;
+      deckLotus.group.scale.setScalar(THREE.MathUtils.damp(deckLotus.group.scale.x, targetScale, 3, dt));
+      deckLotus.update(t, charge); boat.setEnergy(charge);
       deckLotus.getLinkPosition(linkTarget);
-      const previousSource = resonance.sourcePosition;
-      if (previousSource) linkSource.set(previousSource.x, previousSource.y + .72 * LOTUS_SCALE, previousSource.z);
-      electricLink.update(t, previousSource ? linkSource : null, linkTarget, resonance.linkOpacity);
+      const previousSource = resonance.linkPosition;
+      if (previousSource) {
+        const linked = waterLotuses.find(item => item.id === resonance.linkId);
+        linkSource.set(previousSource.x, previousSource.y + .72 * (linked ? linked.diameter / LOTUS_REFERENCE_DIAMETER : LOTUS_SCALE), previousSource.z);
+      }
+      electricLink.update(t, previousSource ? (resonance.linkRole === 'taker' ? linkTarget : linkSource) : null,
+        resonance.linkRole === 'taker' ? linkSource : linkTarget, resonance.linkOpacity);
+      saveElapsed += activeSeconds;
+      if (saveElapsed >= 1) { saveEnergy(); saveElapsed = 0; }
       wake.update(o.playing ? dt : 0, t, boatState, o.night, navigating && !o.suspended && o.playing);
       destinationMarker.visible = navigating && !!boatState.destination;
       if (boatState.destination) {
@@ -165,8 +239,12 @@ export function Garden(props) {
         o.onCameraPosition({ x: camera.position.x, y: camera.position.y, z: camera.position.z }); lastHud = now;
         o.onBoatState({ x: boatState.position.x, z: boatState.position.z, heading: boatState.heading,
           speed: o.playing && navigating ? boatState.velocity.length() : 0, distance: boatState.distance,
-          energy: { charge: resonance.charge, connected: resonance.connected, distance: resonance.distance, range: RESONANCE_RANGE,
-            secondsRemaining: resonance.charge === resonance.transitionTarget ? 0 : Math.max(0, POWER_TRANSITION_SECONDS - resonance.transitionElapsed) },
+          energy: { charge, units: resonance.energy, capacity: stats.capacity, level: resonance.level,
+            delivered: resonance.delivered, restored: resonance.restored, nextThreshold: BOAT_LEVELS[resonance.level]?.threshold,
+            connected: !!resonance.linkId, role: resonance.linkRole, name: resonance.linkName,
+            secondsRemaining: resonance.energy / (stats.capacity/stats.autonomy), autonomy: stats.autonomy,
+            lotuses: waterLotuses.map(item => ({ id: item.id, name: item.name, energyRole: item.energyRole,
+              energy: item.energy, capacity: item.capacity, x: item.x, z: item.z, size: item.size })) },
           destination: boatState.destination ? { x: boatState.destination.x, z: boatState.destination.z } : null });
       }
       if (elapsed > 0 && elapsed < .25) { sampleTime += elapsed; sampleFrames++; }
@@ -181,6 +259,9 @@ export function Garden(props) {
     }
     frame = requestAnimationFrame(animate); options.current.onReady(true);
     return () => {
+      saveEnergy();
+      window.removeEventListener('pagehide', saveEnergy);
+      waterEntities.forEach(entity => entity.flower?.dispose());
       cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', resetTiming);
       observer.disconnect(); sailing.dispose(); flight.dispose(); controls.dispose(); lotus.dispose(); deckLotus.dispose(); boat.dispose(); pond.dispose();
       disposeMeshes(scene); renderer.dispose(); el.removeChild(renderer.domElement); props.sceneRef.current = null;

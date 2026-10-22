@@ -16,7 +16,7 @@ export function createBoatLotus(renderer, palette) {
   flower.group.scale.setScalar(scale); group.add(flower.group);
   return {
     group,
-    update(time, charge) { flower.update(time, .78, charge); group.userData.charge = charge; },
+    update(time, charge) { flower.setSaturation(charge); flower.update(time, .78, charge); group.userData.charge = charge; },
     getLinkPosition(target) {
       return flower.group.localToWorld(target.set(0, .72, 0));
     },

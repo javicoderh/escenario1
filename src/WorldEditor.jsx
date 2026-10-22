@@ -1,3 +1,6 @@
+import { LotusEditor } from './LotusEditor.jsx';
+import { ZoneSectors } from './ZoneMap.jsx';
+import { zoneAt } from './world-zones.js';
 import React, { useState } from 'react';
 import { WORLD_RADIUS, GRID_STEP, LEVELS, isValidPosition } from './world-layout.js';
 import { LOTUS_DIAMETER } from './lotus-scale.js';
@@ -45,6 +48,7 @@ export function WorldEditor({ layout, setLayout, selection, setSelection, flight
         <defs><pattern id="map-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#84b7bd" strokeOpacity=".15" strokeWidth=".5"/></pattern></defs>
         <circle cx="120" cy="120" r="100" fill="#132d32" stroke={activeLevel.color} strokeOpacity=".7"/>
         <circle cx="120" cy="120" r="100" fill="url(#map-grid)"/>
+        <ZoneSectors/>
         <circle cx="120" cy="120" r="50" fill="none" stroke="#9bd8db" strokeOpacity=".18" strokeDasharray="2 3"/>
         <path d="M20 120H220M120 20V220" stroke="#a5d4cd" strokeOpacity=".4" strokeWidth=".7"/>
         <text x="120" y="12" textAnchor="middle">N / −Z</text><text x="120" y="235" textAnchor="middle">S / +Z</text>
@@ -53,10 +57,12 @@ export function WorldEditor({ layout, setLayout, selection, setSelection, flight
           fill={LEVELS.find(level => level.y === marker.y).color} opacity={marker.y === selection.y ? 1 : .25}
           onClick={event => { event.stopPropagation(); choose(marker, marker.id, marker.name); }}><title>{marker.name} · {marker.x}, {marker.y}, {marker.z}</title></circle>; })}
         {layout.lotus.visible && <text x={lotusMap.x} y={lotusMap.y + 3} textAnchor="middle" className="map-lotus">✿<title>Loto</title></text>}
+        {layout.lotuses.map(item => { const point = mapPoint(item); return <circle key={item.id} cx={point.x} cy={point.y} r="3" fill={item.energyRole === 'giver' ? '#ffbd70' : '#b5bac5'} stroke="#172c31" onClick={event => { event.stopPropagation(); choose(item); }}><title>{item.name} ? {item.energyRole} ? {item.size}</title></circle>; })}
         {valid && <path d={`M${cursorMap.x - 5} ${cursorMap.y}h10M${cursorMap.x} ${cursorMap.y - 5}v10`} stroke="white" strokeWidth="1.5" pointerEvents="none"/>}
         {Math.hypot(cameraPosition.x, cameraPosition.z) <= WORLD_RADIUS && <circle cx={cameraMap.x} cy={cameraMap.y} r="2.5" fill="#fff" stroke="#132d32" pointerEvents="none"><title>Cámara</title></circle>}
       </svg>
       <span>Clic para situar · ajuste de 25 m</span>
+      <span>Zona {zoneAt(selection).id} · {zoneAt(selection).name}</span>
     </div>
     <fieldset className="level-selector"><legend>Cotas de trabajo · separación de 15 m</legend>
       {[...LEVELS].reverse().map(level => <button key={level.id} aria-pressed={selection.y === level.y}
@@ -83,6 +89,7 @@ export function WorldEditor({ layout, setLayout, selection, setSelection, flight
         <button onClick={() => setLayout(previous => ({ ...previous, lotus: { ...previous.lotus, visible: !previous.lotus.visible } }))}>{layout.lotus.visible ? 'Ocultar loto' : 'Mostrar loto'}</button></div>
       {layout.lotus.visible && <button className="text-action" onClick={() => { choose(layout.lotus); sceneRef.current?.focusLotus(); }}>Acercar cámara al loto ↗</button>}
     </div>
+    <LotusEditor {...{layout,setLayout,selection,valid,setSelection}}/>
     <div className="editor-section"><label className="editor-field">Velocidad de vuelo <span>{flightSpeed} m/s</span><input type="range" min="0.5" max="120" step="0.5" value={flightSpeed} onChange={event => setFlightSpeed(Number(event.target.value))}/></label>
       <p className="editor-hint">WASD · E / Espacio subir · Q / Ctrl bajar<br/>Rueda para zoom · Shift ×4 · arrastrar para mirar · Esc liberar</p>
     </div>

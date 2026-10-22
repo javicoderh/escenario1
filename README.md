@@ -15,19 +15,56 @@ La cámara sigue al velero en tercera persona, desde atrás y ligeramente elevad
 
 La estela deposita muestras de espuma en el recorrido real, en lugar de moverlas junto al casco. Cada muestra se expande y se desvanece en 6,5 segundos. Sus pequeños destellos toman tonos azul plateado con luna llena y tonos cálidos al ocaso. La espuma, el velero y el farol comparten los reflejos del mar. El mapa de coordenadas sigue disponible en **Construir escenario**, con su cámara de vuelo libre.
 
-## Loto de cubierta y resonancia
+## Lotos de energ?a y progresi?n
 
-Sobre la cubierta viaja un segundo loto de **1,4 m de diámetro de referencia** (70 % del loto del mar). Es una entidad receptora independiente, con sus propias mallas, articulaciones, luz, aura y función. Se conecta al anclaje de cubierta del velero: hereda su posición, giro y balanceo, mientras el barco conserva la responsabilidad de navegar y mostrar sus líneas de energía.
+El loto de cubierta empieza con 100 unidades de capacidad y 40 segundos de autonomía completa. Recibe energía de los **givers** y restaura los **takers**. El progreso se gana por unidades entregadas. Llegar a cero apaga sus efectos sin perder nivel. La barra de energía permanece sobre la escena, también en pantalla completa.
 
-Al entrar a **12 m** horizontales de un loto visible situado al nivel del mar, aparece un enlace ramificado de rayos eléctricos con aura. El alcance está definido en `RESONANCE_RANGE` de `src/lotus-resonance.js`. La selección de fuentes admite varios lotos de agua; la escena actual proporciona el loto marino existente. Los lotos ocultos o situados en otras cotas no cargan al receptor; el propio loto de cubierta tampoco se usa como fuente.
+| Nivel | Unidades entregadas acumuladas | Capacidad | Autonomía completa | Escala |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 0 | 100 | 40 s | 1 |
+| 2 | 100 | 140 | 90 s | 1,15 |
+| 3 | 250 | 190 | 140 s | 1,30 |
+| 4 | 500 | 250 | 200 s | 1,45 |
+| 5 | 900 | 330 | 270 s | 1,60 |
+| 6 | 1600 | 430 | 330 s | 1,60 |
+| 7 | 2600 | 560 | 400 s | 1,60 |
+| 8 | 4200 | 720 | 480 s | 1,60 |
 
-- **Encendido:** la intensidad sube linealmente desde su valor actual hasta 100 % en **40 segundos** de escena activa.
-- **Desconexión:** los rayos y su aura se desvanecen en **1,5 segundos**. La energía almacenada permanece en el loto de cubierta y las líneas del velero.
-- **Apagado:** la intensidad baja linealmente desde el nivel alcanzado hasta cero en **40 segundos**. Esto también aplica si la carga era parcial; por ejemplo, una carga de 60 % baja a 30 % tras 20 segundos y llega a cero tras 40 segundos.
-- **Reconexión:** parte del brillo que queda, sin saltos, e inicia un nuevo encendido lineal. Cambiar de fuente mientras se mantiene el enlace no reinicia la carga.
-- Los temporizadores usan segundos activos reales, independientemente del ajuste de ritmo de animación y la tasa de cuadros. Pausar, abrir el modal o dejar la pestaña oculta suspende la transición. Cambiar de paleta mantiene la carga; recargar la página la reinicia.
+En **Construir escenario → Lotos de energía** puedes crear, seleccionar, editar y eliminar hasta 320 lotos adicionales al nivel del mar. Configura nombre, rol, tamaño, diámetro real, paleta, capacidad, energía inicial, transferencia por segundo, rango y regeneración. El mapa de navegación muestra los ocho sectores de 45°, sus nombres, las reservas y la posición del bote.
 
-El panel de navegación muestra la carga, la conexión y los segundos restantes. Al llegar a cero se apagan la emisión de los pétalos y el corazón, el polen, el aura, las esporas y las líneas energizadas del casco. La flor sigue siendo un objeto visible iluminado por el ambiente. La lógica de energía, el receptor y el efecto de enlace están separados en `lotus-resonance.js`, `boat-lotus.js` y `electric-link.js`.
+El mundo se siembra automáticamente con 160 lotos (45 givers y 115 takers), además del loto de origen. La migración conserva los objetos existentes. La marca `zonesVersion` evita repetir la siembra o recrear lotos eliminados. Los modelos detallados se cargan cerca de la cámara; los lejanos usan una silueta simple que también refleja su energía.
+
+| Zona | Nombre | Givers | Takers |
+| --- | --- | ---: | ---: |
+| 1 | Cuna del Alba | 2 | 5 |
+| 2 | Jardín de Bruma | 3 | 7 |
+| 3 | Bahía de Seda | 4 | 9 |
+| 4 | Mareas de Ámbar | 5 | 12 |
+| 5 | Santuario Esmeralda | 6 | 15 |
+| 6 | Mar de los Colosos | 7 | 18 |
+| 7 | Abismo Estelar | 8 | 22 |
+| 8 | Corona del Loto | 10 | 27 |
+
+Cada sector aumenta la reserva total de sus fuentes y la demanda de sus receptores. Sus rutas parten cerca del centro y se extienden más al aumentar la dificultad. Los takers de las últimas zonas alcanzan 440 unidades de capacidad. Las zonas están abiertas: el nivel mejora la capacidad del bote, sin barreras de acceso.
+
+| Tamaño | Diámetro inicial | Capacidad inicial del taker |
+| --- | ---: | ---: |
+| small | 2 m | 10 u |
+| small-mid | 3 m | 20 u |
+| mid | 5 m | 35 u |
+| big | 8 m | 60 u |
+| giant | 13 m | 100 u |
+| huge | 20 m | 160 u |
+
+Estos valores son editables. Los givers manuales empiezan llenos con 20 veces la capacidad de su tamaño, transfieren 10 u/s y regeneran 1 u/s mientras no son el enlace activo. Los takers manuales empiezan vacíos y reciben 5 u/s. El rango por defecto es 30 m. La siembra ajusta capacidades y tasas por zona, y usa un rango de 12 m en los takers.
+
+Cada unidad transferida se descuenta del emisor. Solo existe un enlace activo: se mantiene mientras sea elegible; después se elige el más cercano. Un bote lleno puede pasar de una fuente a un taker cercano. Los lotos ocultos o fuera del nivel del mar no enlazan. Fuera de un enlace el bote consume capacidad/autonomía por segundo. La transferencia suspende ese consumo pasivo.
+
+En todos los lotos, la saturación, la emisión y la opacidad del aura siguen la fracción energía/capacidad. A cero quedan en blanco y negro, sin aura ni luz; al recibir energía recuperan gradualmente sus colores y efectos. Esto funciona tanto para la descarga de givers como para la carga de takers y la regeneración de fuentes. Los takers completos dejan de extraer y permanecen restaurados. La carga parcial se conserva. El loto de cubierta crece hasta una escala máxima de 1,60.
+
+Los temporizadores usan segundos activos independientes del ritmo de animación; pausa, modal y pestaña oculta suspenden la transferencia. El escenario se guarda en `flamming-lottus-world-v1` y el progreso en `flamming-lottus-energy-v1`, en localStorage. Recargar recupera ambos; editar atributos de un loto reinicia su reserva según la configuración. El JSON exportado contiene el escenario y las energías iniciales.
+
+La lógica está en `src/lotus-energy.js` y la siembra en `src/world-zones.js`. Los antiguos helpers de `lotus-resonance.js` permanecen por compatibilidad; la escena utiliza el nuevo sistema.
 
 ## Escenario marino y modo de construcción
 

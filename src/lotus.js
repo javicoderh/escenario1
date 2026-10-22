@@ -25,10 +25,11 @@ export function addInkOutline(material, palette, variant = 0) {
   // Paint the border in the existing draw call, so it follows the skinned mesh
   // without a second shell, extra triangles or a full-screen outline pass.
   material.onBeforeCompile = shader => {
+    shader.uniforms.lotusSaturation = material.userData.saturation || { value: 1 };
     shader.uniforms.lotusInk = { value: ink };
     shader.uniforms.lotusGlint = { value: glint };
     shader.uniforms.lotusStrokePhase = { value: variant * .73 };
-    shader.fragmentShader = 'uniform vec3 lotusInk;\nuniform vec3 lotusGlint;\nuniform float lotusStrokePhase;\n' + shader.fragmentShader;
+    shader.fragmentShader = 'uniform float lotusSaturation;\nuniform vec3 lotusInk;\nuniform vec3 lotusGlint;\nuniform float lotusStrokePhase;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
       vec2 lotusUV = vMapUv;
       float lotusStroke = 0.013 + 0.004 * sin(lotusUV.y * 24.0 + lotusUV.x * 7.0)
@@ -56,6 +57,7 @@ export function addInkOutline(material, palette, variant = 0) {
         + lotusEdgeLine * smoothstep(0.25, 0.65, lotusUV.y) * 0.55) * lotusLineFade;
       outgoingLight += lotusGlint * lotusHighlights * (0.65 + 0.35 * lotusFacing);
       outgoingLight = mix(outgoingLight, lotusInk, lotusInkMask * 0.94);
+      outgoingLight = mix(vec3(dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722))), outgoingLight, lotusSaturation);
       #include <opaque_fragment>
     `);
   };
@@ -305,10 +307,20 @@ export function createLivingLotus(palette, renderer, worldScale = 1, { powerCont
 
   const magic = createLotusMagic(COLORS[palette]);
   group.add(magic.group);
+  const saturation = { value: 1 };
+  materials.forEach(material => { material.userData.saturation = saturation; });
+  const plainColors = [calyx.material, heart.material, pollenMaterial].map(material => ({ material, color: material.color.clone() }));
   const wind = { direction: 0, strength: 0 };
 
   return {
     group,
+    setSaturation(value) {
+      saturation.value = value;
+      plainColors.forEach(({ material, color }) => {
+        const gray = color.r * .2126 + color.g * .7152 + color.b * .0722;
+        material.color.setRGB(gray, gray, gray).lerp(color, value);
+      });
+    },
     update(time, bloom, energy = 1) {
       wind.direction = .8 + Math.sin(time * .19) * .40;
       wind.strength = .52 + Math.sin(time * .73) * .22 + Math.sin(time * 1.61 + .6) * .12;

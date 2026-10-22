@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createLivingLotus, createPetalGeometry } from '../src/lotus.js';
 import { LOTUS_DIAMETER, LOTUS_SCALE } from '../src/lotus-scale.js';
+import { disposeMeshes } from '../src/world-guides.js';
 
 test('petal surface has finite normals and continuous edges', () => {
   const geometry = createPetalGeometry({ length: 3.8, width: .55, phase: 1.4 });
@@ -32,6 +33,38 @@ function textureCanvas() {
   };
   return { getContext: () => context };
 }
+
+test('energy controls continuous aura opacity, saturation and light in both directions', () => {
+  const previous = globalThis.document;
+  globalThis.document = { createElement: textureCanvas };
+  const lotus = createLivingLotus('ember', { capabilities: { getMaxAnisotropy: () => 1 } }, 1, { powerControlled:true });
+  try {
+    for (const power of [1,.5,0,.25,.75,1]) {
+      lotus.setSaturation(power); lotus.update(0,.85,power);
+      const uniforms=[], petals=[], lights=[];
+      lotus.group.traverse(object => {
+        if(object.material?.uniforms?.uPower) uniforms.push(object.material.uniforms.uPower.value);
+        if(object.material?.userData?.saturation) petals.push(object.material);
+        if(object.isPointLight) lights.push(object);
+      });
+      assert.equal(uniforms.length,3);
+      assert.ok(uniforms.every(value => value === power));
+      assert.ok(petals.every(material => material.userData.saturation.value === power));
+      assert.equal(lights[0].intensity,power*18);
+      const shader={uniforms:{},fragmentShader:'#include <opaque_fragment>'};
+      petals[0].onBeforeCompile(shader);
+      assert.equal(shader.uniforms.lotusSaturation.value,power);
+      assert.ok(shader.fragmentShader.includes('outgoingLight = mix(vec3(dot(outgoingLight'));
+      if(power===0) {
+        const magic=lotus.group.children.find(object=>object.name==='Nen aura and living spores');
+        assert.equal(magic.visible,false);
+      }
+    }
+  } finally {
+    lotus.dispose();disposeMeshes(lotus.group);
+    if(previous === undefined) delete globalThis.document; else globalThis.document=previous;
+  }
+});
 
 test('all petals deform independently and remain stable through bloom extremes', () => {
   const oldDocument = globalThis.document;
