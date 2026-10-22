@@ -81,11 +81,35 @@ test('deck lotus is a separate receiver that inherits boat transforms and owns i
     lotus.update(0, .5); const halfLight = lights[0].intensity;
     lotus.update(0, 1); close(lights[0].intensity, halfLight * 2);
     boat.setEnergy(1); assert.equal(boat.group.userData.power, 1);
+    boat.update(1, 4);
+    const electricity = boat.group.getObjectByName('Circuitos y descargas del velero');
+    assert.equal(electricity.visible, true);
+    const arcs = electricity.children[1].children[0].geometry.attributes.position;
+    const frozenArcs = arcs.array.slice();
+    boat.update(1, 4); assert.deepEqual(arcs.array, frozenArcs, 'paused electricity keeps its exact shape');
     lotus.update(0, 0); assert.equal(boat.group.userData.power, 1, 'receiver and vehicle retain distinct responsibilities');
+    boat.setEnergy(0); assert.equal(electricity.visible, false, 'zero charge switches off circuits and arcs');
   } finally {
     lotus.dispose(); boat.dispose(); disposeMeshes(boat.group);
     if (previous === undefined) delete globalThis.document; else globalThis.document = previous;
   }
+});
+
+test('lightning forks stay attached and geometry remains continuous in time and vertical links', () => {
+  const link = createElectricLink(), start = new THREE.Vector3(0, .2, 0), end = new THREE.Vector3(8, 1, 4);
+  link.update(1, start, end, 1);
+  const geometry = link.group.children[0].geometry, positions = geometry.attributes.position;
+  const point = index => new THREE.Vector3().fromBufferAttribute(positions, index);
+  assert.ok(point(3 * 130).distanceTo(point(15 * 2)) < 1e-6);
+  assert.ok(point(3 * 130 + 128).distanceTo(point(29 * 2)) < 1e-6);
+  const frozen = positions.array.slice();
+  link.update(1, start, end, 1); assert.deepEqual(positions.array, frozen);
+  link.update(1 + 1e-5, start, end, 1);
+  assert.ok(positions.array.every((value, i) => Math.abs(value - frozen[i]) < .001));
+  link.update(2, start, new THREE.Vector3(0, 8, 0), 1);
+  assert.ok(positions.array.every(Number.isFinite));
+  link.update(2, start, start, 1); assert.equal(link.group.visible, false);
+  disposeMeshes(link.group);
 });
 
 test('lightning preserves endpoint anchors, has finite geometry and fades to invisible', () => {

@@ -8,7 +8,7 @@ export function SailingPanel({ boatState, boatSpeed, setBoatSpeed, sceneRef, nig
   const energy = boatState.energy || { charge: 0, connected: false, secondsRemaining: 0, distance: null };
   return <aside className="sailing-panel">
     <div className="eyebrow">TU PERSONAJE</div><h2>Espíritu de seda</h2>
-    <p className="sailing-description">Un velero de madera, tinta y luz.<br/>El mismo latido que mueve al loto.</p>
+    <p className="sailing-description">Seda, tinta y circuitos de luz.<br/>El loto despierta su espíritu eléctrico.</p>
     <div className="sailing-compass"><span>N</span><div style={{ transform: `rotate(${-heading}deg)` }}>✧</div><b>{compass[Math.round(heading / 45) % 8]}</b><small>{Math.round(heading)}°</small></div>
     <div className="boat-coordinates"><div><span>POSICIÓN X</span><b>{boatState.x.toFixed(1)} <small>m</small></b></div><div><span>POSICIÓN Z</span><b>{boatState.z.toFixed(1)} <small>m</small></b></div><div><span>VELOCIDAD</span><b>{boatState.speed.toFixed(1)} <small>m/s</small></b></div><div><span>RECORRIDO</span><b>{boatState.distance.toFixed(0)} <small>m</small></b></div></div>
     <section className={`resonance-readout ${energy.connected?'connected':''}`} data-connected={energy.connected} data-charge={energy.charge} aria-label="Energía del loto de cubierta">

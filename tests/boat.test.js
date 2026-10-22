@@ -33,7 +33,7 @@ test('spawn, destinations and manual movement stay inside the world boundary', (
   assert.equal(state.destination, previous);
 });
 
-test('foam stays on the historical route, fades out and follows the sky palette', () => {
+test('ink wake stays on the historical route, fades out and follows the sky palette', () => {
   const wake = createBoatWake(), state = createBoatState({ x: 0, z: 0 });
   state.velocity.set(0, 0, -4);
   wake.update(.1, 1, state, true);
@@ -47,5 +47,47 @@ test('foam stays on the historical route, fades out and follows the sky palette'
   wake.update(7, 8, state, false, false);
   assert.equal(wake.mesh.geometry.attributes.aLife.getX(0), 0, 'foam expires');
   assert.equal(wake.mesh.material.uniforms.uSky.value.equals(moonColor), false, 'warm sunset and cool moonlight differ');
+  wake.mesh.geometry.dispose(); wake.mesh.material.dispose();
+});
+
+test('wake spacing is stable across frame rates and pause preserves all deposited strokes', () => {
+  const routes = [];
+  for (const fps of [20, 60, 144]) {
+    const wake = createBoatWake(), state = createBoatState({ x: 0, z: 0 });
+    state.heading = 0; state.velocity.set(0, 0, -12);
+    wake.update(1 / fps, 0, state, true);
+    for (let i = 1; i <= fps * 2; i++) {
+      state.position.z = 9 - 12 * i / fps;
+      wake.update(1 / fps, i / fps, state, true);
+    }
+    const matrix = new THREE.Matrix4(), positions = [];
+    for (let i = 0; i < wake.mesh.count; i++) if (wake.mesh.geometry.attributes.aLife.getX(i) > 0) {
+      wake.mesh.getMatrixAt(i, matrix); positions.push(matrix.elements[14]);
+    }
+    routes.push(positions);
+    const frozenMatrices = wake.mesh.instanceMatrix.array.slice();
+    const frozenLife = wake.mesh.geometry.attributes.aLife.array.slice();
+    wake.update(0, 10, state, true);
+    assert.deepEqual(wake.mesh.instanceMatrix.array, frozenMatrices);
+    assert.deepEqual(wake.mesh.geometry.attributes.aLife.array, frozenLife);
+    assert.equal(wake.mesh.material.uniforms.uTime.value, 2);
+    wake.mesh.geometry.dispose(); wake.mesh.material.dispose();
+  }
+  assert.equal(routes[0].length, routes[1].length);
+  assert.equal(routes[0].length, routes[2].length);
+  for (let i = 0; i < routes[0].length; i++) {
+    assert.ok(Math.abs(routes[0][i] - routes[1][i]) < 1e-5);
+    assert.ok(Math.abs(routes[0][i] - routes[2][i]) < 1e-5);
+  }
+});
+
+test('ink strokes align with diagonal travel instead of crossing the heading', () => {
+  const wake = createBoatWake(), state = createBoatState({ x: 0, z: 0 });
+  state.heading = Math.PI / 4;
+  state.velocity.set(-Math.sin(state.heading) * 4, 0, -Math.cos(state.heading) * 4);
+  wake.update(.1, 1, state, true);
+  const matrix = new THREE.Matrix4(); wake.mesh.getMatrixAt(0, matrix);
+  const strokeDirection = new THREE.Vector3(0, 1, 0).transformDirection(matrix);
+  assert.ok(strokeDirection.dot(state.velocity.clone().normalize()) > .99999);
   wake.mesh.geometry.dispose(); wake.mesh.material.dispose();
 });

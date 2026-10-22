@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { addInkOutline, petalMaps } from './lotus.js';
+import { createBoatEnergy } from './boat-energy.js';
 
 function hullGeometry() {
   const positions = [], uvs = [], indices = [];
@@ -27,7 +28,7 @@ function hullGeometry() {
 function deckTexture() {
   const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 256;
   const ctx = canvas.getContext('2d'), image = ctx.createImageData(128, 256);
-  const dark = new THREE.Color('#47252d'), light = new THREE.Color('#ae7451'), color = new THREE.Color();
+  const dark = new THREE.Color('#141d31'), light = new THREE.Color('#596175'), color = new THREE.Color();
   const bayer = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
   for (let y = 0; y < 256; y++) for (let x = 0; x < 128; x++) {
     const grain = Math.sin(x * .9 + Math.sin(y * .07) * 2) * .1;
@@ -48,7 +49,7 @@ export function createSailboat(renderer, palette = 'ember', { textureCache } = {
   const textures = [];
   const wood = deckTexture(); textures.push(wood);
   const hullMaterial = addInkOutline(new THREE.MeshPhysicalMaterial({
-    map: wood, color: '#bd5960', side: THREE.DoubleSide, roughness: .5, sheen: .4, sheenColor: '#d98d66', metalness: .04,
+    map: wood, color: '#aea5c9', side: THREE.DoubleSide, roughness: .48, sheen: .4, sheenColor: '#826ac3', metalness: .18,
   }), palette, 2);
   const hull = new THREE.Mesh(hullGeometry(), hullMaterial); group.add(hull);
   const deckShape = new THREE.Shape();
@@ -62,10 +63,10 @@ export function createSailboat(renderer, palette = 'ember', { textureCache } = {
   const deckGeometry = new THREE.ShapeGeometry(deckShape);
   const deckUV = deckGeometry.attributes.uv, deckPosition = deckGeometry.attributes.position;
   for (let i = 0; i < deckUV.count; i++) deckUV.setXY(i, (deckPosition.getX(i) + .86) / 1.72, (deckPosition.getY(i) + 2.2) / 4.6);
-  const deck = new THREE.Mesh(deckGeometry, new THREE.MeshStandardMaterial({ map: wood, color: '#cfac83', roughness: .65 }));
+  const deck = new THREE.Mesh(deckGeometry, new THREE.MeshStandardMaterial({ map: wood, color: '#a3b7bd', roughness: .65 }));
   deck.rotation.x = -Math.PI / 2; deck.position.y = .37; group.add(deck);
-  const gold = new THREE.MeshStandardMaterial({ color: '#e2b776', metalness: .3, roughness: .4, emissive: '#b96b31', emissiveIntensity: .1 });
-  const timber = new THREE.MeshStandardMaterial({ map: wood, color: '#775143', roughness: .55 });
+  const gold = new THREE.MeshStandardMaterial({ color: '#c39b9c', metalness: .35, roughness: .4, emissive: '#4dd7df', emissiveIntensity: .04 });
+  const timber = new THREE.MeshStandardMaterial({ map: wood, color: '#85989e', roughness: .55 });
   for (const z of [-1.05, .95]) {
     const seat = new THREE.Mesh(new THREE.BoxGeometry(1.25, .09, .24), timber);
     seat.position.set(0, .49, z); group.add(seat);
@@ -76,26 +77,13 @@ export function createSailboat(renderer, palette = 'ember', { textureCache } = {
   lotusMount.position.set(0, .63, .8); group.add(lotusMount);
   const cradle = new THREE.Mesh(new THREE.CylinderGeometry(.22, .27, .08, 32), gold);
   cradle.position.set(0, .57, .8); group.add(cradle);
-  const energyLines = new THREE.Group(); energyLines.name = 'Líneas de energía del velero'; group.add(energyLines);
-  const energyCore = new THREE.MeshBasicMaterial({ color: '#ffe3a1', transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
-  const energyAura = new THREE.MeshBasicMaterial({ color: '#ff9d42', transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
-  function conduit(points) {
-    const curve = new THREE.CatmullRomCurve3(points);
-    energyLines.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 48, .012, 6, false), energyCore));
-    energyLines.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 48, .045, 6, false), energyAura));
-  }
+  const electricity = createBoatEnergy(); group.add(electricity.group);
+  const chargeUniform = { value: 0 }, timeUniform = { value: 0 };
   function tube(points, radius, material = gold) {
     const curve = new THREE.CatmullRomCurve3(points);
     const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, radius, 7, false), material); group.add(mesh); return mesh;
   }
   for (const sign of [-1, 1]) {
-    conduit(Array.from({ length: 25 }, (_, i) => {
-      const t = .06 + i / 24 * .88;
-      return new THREE.Vector3(sign * (.025 + .84 * Math.pow(Math.sin(Math.PI * t), .68)), .435 + Math.pow(Math.abs(t * 2 - 1), 3) * .4, -2.4 + t * 4.6);
-    }));
-    conduit([new THREE.Vector3(0, .635, .8), new THREE.Vector3(sign * .35, .58, .7), new THREE.Vector3(sign * .75, .45, .4)]);
     tube(Array.from({ length: 25 }, (_, i) => {
       const t = i / 24;
       return new THREE.Vector3(sign * (.02 + .84 * Math.pow(Math.sin(Math.PI * t), .68)), .4 + Math.pow(Math.abs(t * 2 - 1), 3) * .4, -2.4 + t * 4.6);
@@ -105,7 +93,17 @@ export function createSailboat(renderer, palette = 'ember', { textureCache } = {
   const mast = new THREE.Mesh(new THREE.CylinderGeometry(.045, .075, 4.65, 12), timber);
   mast.position.set(0, 2.65, -.25); group.add(mast);
   const mastFinial = new THREE.Mesh(new THREE.SphereGeometry(.085, 16, 12), gold); mastFinial.position.set(0, 5, -.25); group.add(mastFinial);
-  const rope = new THREE.MeshStandardMaterial({ color: '#b69b72', roughness: .85 });
+  const rope = new THREE.MeshStandardMaterial({ color: '#71658c', roughness: .85 });
+  // Small lacquered armor scales retain the low-poly, hand-inked silhouette.
+  const armorMaterial = new THREE.MeshStandardMaterial({ color: '#34364f', roughness: .58, metalness: .18 });
+  const armor = new THREE.InstancedMesh(new THREE.BoxGeometry(.085, .18, .43), armorMaterial, 8);
+  const armorPose = new THREE.Object3D();
+  for (let i = 0; i < 8; i++) {
+    const sign = i < 4 ? -1 : 1, z = -.95 + (i % 4) * .65, t = (z + 2.4) / 4.6;
+    armorPose.position.set(sign * (.025 + .84 * Math.pow(Math.sin(Math.PI * t), .68)), .25, z);
+    armorPose.rotation.set(0, sign * (t - .5) * -.65, sign * -.16); armorPose.updateMatrix(); armor.setMatrixAt(i, armorPose.matrix);
+  }
+  group.add(armor);
   tube([new THREE.Vector3(0, .75, -2.35), new THREE.Vector3(0, 2.8, -1.4), new THREE.Vector3(0, 4.8, -.25)], .009, rope);
   tube([new THREE.Vector3(0, 4.8, -.25), new THREE.Vector3(0, 2.6, 1), new THREE.Vector3(0, .7, 2.1)], .009, rope);
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(.032, .045, 2.9, 10), timber);
@@ -118,6 +116,29 @@ export function createSailboat(renderer, palette = 'ember', { textureCache } = {
     roughness: .53, sheen: .65, sheenRoughness: .7, sheenColor: '#ffe1b4',
     emissive: '#b9282d', emissiveMap: map, emissiveIntensity: .12,
   }), palette, 1);
+  // Inlaid traces share the original silk texture, dither and ink shader.
+  const silkCompile = sailMaterial.onBeforeCompile;
+  sailMaterial.onBeforeCompile = shader => {
+    silkCompile(shader);
+    shader.uniforms.boatCharge = chargeUniform; shader.uniforms.boatTime = timeUniform;
+    shader.fragmentShader = 'uniform float boatCharge; uniform float boatTime;\n' + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
+      vec2 circuitUV = vMapUv;
+      float circuitAA = max(fwidth(circuitUV.x), 0.001);
+      float circuitEdge = min(abs(circuitUV.x - 0.045), abs(circuitUV.x - 0.955));
+      float circuitSeam = 1.0 - smoothstep(0.003, 0.006 + circuitAA, circuitEdge);
+      float circuitSpine = abs(circuitUV.x - 0.25 - floor(circuitUV.y * 5.0) * 0.025);
+      float circuitTrace = (1.0 - smoothstep(0.002, 0.004 + circuitAA, circuitSpine))
+        * smoothstep(0.12, 0.18, circuitUV.y) * (1.0 - smoothstep(0.7, 0.8, circuitUV.y));
+      float circuitHem = 1.0 - smoothstep(0.004, 0.008 + fwidth(circuitUV.y), abs(circuitUV.y - 0.035));
+      float circuitPulse = pow(max(0.0, sin(circuitUV.y * 18.0 - boatTime * 3.0)), 8.0);
+      vec3 circuitColor = mix(vec3(0.12, 0.8, 0.95), vec3(0.85, 0.15, 0.48), circuitUV.x);
+      outgoingLight += circuitColor * (circuitSeam + circuitTrace * 0.65 + circuitHem * 0.6)
+        * boatCharge * (0.6 + circuitPulse * 0.7);
+      #include <opaque_fragment>
+    `);
+  };
+  sailMaterial.customProgramCacheKey = () => 'lotus-silk-cyber-circuits-v1';
   const rows = 40, columns = 28, vertices = [], uvs = [], indices = [];
   for (let row = 0; row <= rows; row++) {
     const v = row / rows;
@@ -140,22 +161,24 @@ export function createSailboat(renderer, palette = 'ember', { textureCache } = {
     petal.scale.set(.08, .28, .025); petal.rotation.z = (i - 2) * .38;
     petal.position.set(Math.sin((i - 2) * .38) * .1, Math.cos((i - 2) * .38) * .09, 0); crest.add(petal);
   }
-  const lanternMaterial = new THREE.MeshStandardMaterial({ color: '#ffdf94', emissive: '#ffc371', emissiveIntensity: 1.1, roughness: .3 });
+  const lanternMaterial = new THREE.MeshStandardMaterial({ color: '#b0e4db', emissive: '#5bd9df', emissiveIntensity: .3, roughness: .3 });
   const lantern = new THREE.Mesh(new THREE.IcosahedronGeometry(.11, 1), lanternMaterial); lantern.position.set(0, .85, -1.75); group.add(lantern);
-  const lanternLight = new THREE.PointLight('#ffbc73', .8, 4); lanternLight.position.copy(lantern.position); group.add(lanternLight);
+  const lanternLight = new THREE.PointLight('#77e8ed', .25, 4); lanternLight.position.copy(lantern.position); group.add(lanternLight);
   const pennant = new THREE.Mesh(new THREE.PlaneGeometry(.8, .22, 12, 2), sailMaterial); pennant.position.set(.4, 4.8, -.25); group.add(pennant);
   return {
     group,
     lotusMount,
     setEnergy(charge) {
-      const power = THREE.MathUtils.clamp(charge, 0, 1);
+      const power = Number.isFinite(charge) ? THREE.MathUtils.clamp(charge, 0, 1) : 0;
       group.userData.power = power;
-      energyLines.visible = power > 0;
-      energyCore.opacity = power;
-      energyAura.opacity = power * .18;
-      gold.emissiveIntensity = .1 + power * .45;
+      chargeUniform.value = power; electricity.setPower(power);
+      gold.emissiveIntensity = .04 + power * .35;
+      crestMaterial.emissive.set(power > 0 ? '#8feaff' : '#ffbe5b');
+      crestMaterial.emissiveIntensity = .2 + power * .65;
+      lanternLight.intensity = .25 + power * .55;
     },
     update(time, speed) {
+      timeUniform.value = time; electricity.update(time);
       group.position.y = .08 + Math.sin(time * 1.35) * .045;
       group.rotation.x = Math.sin(time * .95) * .018;
       group.rotation.z = Math.sin(time * 1.2 + .7) * .025 - Math.min(speed / 4, 1) * .025;
@@ -168,7 +191,7 @@ export function createSailboat(renderer, palette = 'ember', { textureCache } = {
       }
       positions.needsUpdate = true; sailGeometry.computeVertexNormals();
       pennant.rotation.y = Math.sin(time * 2) * .25;
-      lanternMaterial.emissiveIntensity = 1 + Math.sin(time * 2) * .12;
+      lanternMaterial.emissiveIntensity = .3 + chargeUniform.value * (.8 + Math.sin(time * 2) * .12);
     },
     dispose() { textures.forEach(texture => texture.dispose()); },
   };

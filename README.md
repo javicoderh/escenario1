@@ -2,7 +2,9 @@
 
 ## Navegar con el velero
 
-La aplicación comienza en **Navegar**, con el velero **Espíritu de seda** junto al loto. Es el personaje controlable: un casco curvo de madera lacada, bordes dorados, mástil con aparejos, asientos, timón y farol. La vela reutiliza las texturas procedurales, el tramado de 16 bits, el material de seda y los contornos de tinta del loto. Cambiar la paleta en **Contemplar loto** actualiza también la vela. El casco flota, la vela se hincha y su borde ondea.
+La aplicación comienza en **Navegar**, con el velero **Espíritu de seda** junto al loto. Es el personaje controlable: un casco curvo de madera lacada azul grafito, pequeñas placas, bordes cobrizos, mástil con aparejos, asientos, timón y farol cian. Su estilo ciberpunk conserva las texturas procedurales, el tramado de 16 bits, la seda y los contornos de tinta del loto. Cambiar la paleta en **Contemplar loto** actualiza también la vela. El casco flota, la vela se hincha y su borde ondea.
+
+La carga del loto enciende circuitos cian y magenta sobre el casco, la cubierta, el mástil y la vela. Los pulsos recorren los circuitos y aparecen descargas cortas alrededor de la flor y los bordes; su intensidad aumenta con la carga y se apagan al agotarse. El enlace entre lotos usa filamentos de tinta luminosa con ramificaciones ancladas al trazo principal y pulsos que viajan del emisor al receptor. La forma se interpola entre descargas para evitar saltos bruscos. Estos efectos comparten geometrías y no añaden luces a la escena.
 
 La cámara sigue al velero en tercera persona, desde atrás y ligeramente elevada. Se puede arrastrar para mirar alrededor; al navegar vuelve suavemente detrás del rumbo. La rueda acerca o aleja la cámara entre 7 y 32 metros.
 
@@ -14,7 +16,7 @@ La cámara sigue al velero en tercera persona, desde atrás y ligeramente elevad
 - La carga multiplica la velocidad base por `1 + carga/capacidad`: con la base de 4 m/s, el bote navega a 4 m/s vacío, 6 m/s al 50 % y 8 m/s lleno. Conserva movimiento sin energía y acelera/frena suavemente.
 - La pausa detiene el desplazamiento, la vela, la flotación y la estela; la cámara sigue disponible.
 
-La estela deposita muestras de espuma en el recorrido real, en lugar de moverlas junto al casco. Cada muestra se expande y se desvanece en 6,5 segundos. Sus pequeños destellos toman tonos azul plateado con luna llena y tonos cálidos al ocaso. La espuma, el velero y el farol comparten los reflejos del mar. El mapa de coordenadas sigue disponible en **Construir escenario**, con su cámara de vuelo libre.
+La estela deposita pinceladas inspiradas en Ōkami sobre el recorrido real. Cada marca tiene puntas afiladas, bordes de tinta oscura, fibras y cortes de pincel seco, con pigmento azul plateado bajo la luna y cálido al ocaso. Las muestras se distribuyen por distancia, siguen también los rumbos diagonales, se ensanchan y desaparecen en 6,5 segundos. Permanecen sobre el agua al alejarse el barco; volver al origen inicia un trazo nuevo. La pausa congela las marcas y su desvanecimiento. La estela, el velero y el farol comparten los reflejos del mar. El mapa de coordenadas sigue disponible en **Construir escenario**, con su cámara de vuelo libre.
 
 ## Lotos de energ?a y progresi?n
 

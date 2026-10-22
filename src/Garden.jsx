@@ -217,7 +217,6 @@ export function Garden(props) {
       const boatState = sailing.state;
       boat.group.position.x = boatState.position.x; boat.group.position.z = boatState.position.z;
       boat.group.rotation.y = boatState.heading;
-      boat.update(t, boatState.velocity.length());
       const activeSeconds = o.playing && !o.suspended ? Math.max(0, elapsed) : 0;
       stepEnergy(resonance, waterLotuses, boatState.position, activeSeconds);
       const stats = boatStats(resonance), charge = resonance.energy / stats.capacity;
@@ -231,7 +230,7 @@ export function Garden(props) {
       field.update(fieldLotuses, camera, t, now, detailBudget, lotusAnchor.visible ? 'water-lotus' : null);
       const targetScale = stats.scale;
       deckLotus.group.scale.setScalar(THREE.MathUtils.damp(deckLotus.group.scale.x, targetScale, 3, dt));
-      deckLotus.update(t, charge); boat.setEnergy(charge);
+      deckLotus.update(t, charge); boat.setEnergy(charge); boat.update(t, boatState.velocity.length());
       deckLotus.getLinkPosition(linkTarget);
       const previousSource = resonance.linkPosition;
       if (previousSource) {
@@ -242,7 +241,7 @@ export function Garden(props) {
         resonance.linkRole === 'taker' ? linkSource : linkTarget, resonance.linkOpacity);
       saveElapsed += activeSeconds;
       if (saveElapsed >= 5) { saveEnergy(); saveElapsed = 0; }
-      wake.update(o.playing ? dt : 0, t, boatState, o.night, navigating && !o.suspended && o.playing);
+      wake.update(o.playing && !o.suspended ? dt : 0, t, boatState, o.night, navigating && !o.suspended && o.playing);
       destinationMarker.visible = navigating && !!boatState.destination;
       if (boatState.destination) {
         destinationMarker.position.copy(boatState.destination);
