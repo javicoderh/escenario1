@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createLivingLotus } from './lotus.js';
+import { createLivingLotus, createLotusTextureCache } from './lotus.js';
 import { createPond, WATER_LEVEL } from './pond.js';
 import { createAtmosphere } from './atmosphere.js';
 import { createFreeCamera } from './free-camera.js';
@@ -13,6 +13,7 @@ import { createSailingControls } from './sailing-controls.js';
 import { createBoatLotus } from './boat-lotus.js';
 import { createElectricLink } from './electric-link.js';
 import { createWaterLotus, createEnergyState, stepEnergy, boatStats, BOAT_LEVELS } from './lotus-energy.js';
+import { createLotusField } from './lotus-field.js';
 import { LOTUS_REFERENCE_DIAMETER } from './lotus-scale.js';
 
 export function Garden(props) {
@@ -21,11 +22,15 @@ export function Garden(props) {
     const el = host.current; let renderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' }); }
     catch { options.current.onReady(false); return; }
-    const maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.75);
+    const maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.25);
+    let pixelCeiling = maxPixelRatio, measuredFps = 60, contextLost = false;
     renderer.setPixelRatio(maxPixelRatio); renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1;
     el.appendChild(renderer.domElement);
-    const scene = new THREE.Scene();
+    renderer.info.autoReset = false;
+    const textureCache = createLotusTextureCache();
+    const field = createLotusField(renderer, textureCache);
+    const scene = new THREE.Scene(); scene.add(field.group);
     const camera = new THREE.PerspectiveCamera(options.current.editing ? 65 : options.current.navigating ? 55 : 38, 1, .1, 24000); camera.layers.enable(1);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.minDistance = LOTUS_SCALE; controls.maxDistance = 4000;
@@ -38,13 +43,16 @@ export function Garden(props) {
     const lotusAnchor = new THREE.Group(); scene.add(lotusAnchor);
     lotusAnchor.userData = { entityId: 'water-lotus', entityType: 'lotus', role: 'water-lotus' };
     lotusAnchor.scale.setScalar(LOTUS_SCALE);
+    // Keep the light count stable across LOD/mode changes. Toggling a model's
+    // visibility must not recompile every lit material in the scene.
+    const originLight = new THREE.PointLight('#ff692b', 0, 3 * LOTUS_SCALE, 2); scene.add(originLight);
     let currentPalette = options.current.palette;
-    let lotus = createLivingLotus(currentPalette, renderer, LOTUS_SCALE, { powerControlled: true }); lotusAnchor.add(lotus.group);
-    let boat = createSailboat(renderer, currentPalette); scene.add(boat.group);
-    let deckLotus = createBoatLotus(renderer, currentPalette); boat.lotusMount.add(deckLotus.group);
+    let originDetail = options.current.navigating || options.current.editing ? 'medium' : 'high';
+    let lotus = createLivingLotus(currentPalette, renderer, LOTUS_SCALE, { powerControlled: true, textureCache, detail: originDetail, pointLight: false }); lotusAnchor.add(lotus.group);
+    let boat = createSailboat(renderer, currentPalette, { textureCache }); scene.add(boat.group);
+    let deckLotus = createBoatLotus(renderer, currentPalette, { textureCache, detail: 'medium' }); boat.lotusMount.add(deckLotus.group);
     const resonance = createEnergyState(), electricLink = createElectricLink(); scene.add(electricLink.group);
-    const waterEntities = new Map();
-    let energyLayout, waterLotuses = [], saveElapsed = 0;
+    let energyLayout, waterLotuses = [], fieldLotuses = [], saveElapsed = 0, detailBudget = 3;
     let savedProgress = {};
     try { savedProgress = JSON.parse(localStorage.getItem('flamming-lottus-energy-v1')) || {}; } catch {}
     if (Number.isFinite(savedProgress.delivered) && savedProgress.delivered >= 0) {
@@ -108,10 +116,15 @@ export function Garden(props) {
       focusBoat: () => sailing.focus(), stopBoat: sailing.stop,
       returnBoat: () => { sailing.returnToLotus(options.current.layout.lotus); pond.invalidate(); },
       resetView: () => options.current.navigating ? sailing.focus() : focusLotus(),
-      capture: () => { pond.invalidate(); renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); },
+      getPerformance: () => ({ fps: measuredFps, pixelRatio: renderer.getPixelRatio(), detailedLotuses: field.detailedCount,
+        calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries,
+        textures: renderer.info.memory.textures, programs: renderer.info.programs.length, contextLost }),
+      capture: () => { pond.invalidate(); renderer.info.reset(); renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); },
     };
     const resize = () => {
       const { width, height } = el.getBoundingClientRect(); if (!width || !height) return;
+      pixelCeiling = Math.min(maxPixelRatio, Math.sqrt(1600000 / (width * height)));
+      renderer.setPixelRatio(Math.min(renderer.getPixelRatio(), pixelCeiling));
       renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix();
     };
     const observer = new ResizeObserver(resize); observer.observe(el); resize();
@@ -121,10 +134,14 @@ export function Garden(props) {
     let sampleTime = 0, sampleFrames = 0, stableWindows = 0;
     const resetTiming = () => { last = performance.now(); sampleTime = 0; sampleFrames = 0; stableWindows = 0; };
     document.addEventListener('visibilitychange', resetTiming);
+    const onContextLost = event => { event.preventDefault(); contextLost = true; options.current.onReady(false); saveEnergy(); };
+    const onContextRestored = () => { contextLost = false; resetTiming(); pond.invalidate(); options.current.onReady(true); };
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost);
+    renderer.domElement.addEventListener('webglcontextrestored', onContextRestored);
     function animate(now) {
       frame = requestAnimationFrame(animate);
       const elapsed = (now - last) / 1000; last = now;
-      if (document.hidden) return;
+      if (document.hidden || contextLost) return;
       const dt = Math.min(elapsed, .05), o = options.current;
       if (o.editing !== editing || o.navigating !== navigating) {
         editing = o.editing; navigating = o.navigating;
@@ -134,18 +151,23 @@ export function Garden(props) {
       controls.enabled = !editing && !navigating && !o.suspended;
       flight.setEnabled(editing && !o.suspended);
       sailing.setEnabled(navigating && !o.suspended);
+      const desiredDetail = navigating || editing ? 'medium' : 'high';
+      if (desiredDetail !== originDetail) {
+        lotus.dispose(); disposeMeshes(lotus.group); lotusAnchor.remove(lotus.group); originDetail = desiredDetail;
+        lotus = createLivingLotus(currentPalette, renderer, LOTUS_SCALE, { powerControlled: true, textureCache, detail: originDetail, pointLight: false }); lotusAnchor.add(lotus.group);
+      }
       if (o.palette !== currentPalette) {
         lotus.dispose(); disposeMeshes(lotus.group); lotusAnchor.remove(lotus.group);
-        energyLayout = null; currentPalette = o.palette; lotus = createLivingLotus(currentPalette, renderer, LOTUS_SCALE, { powerControlled: true }); lotusAnchor.add(lotus.group); pond.invalidate();
+        energyLayout = null; currentPalette = o.palette; lotus = createLivingLotus(currentPalette, renderer, LOTUS_SCALE, { powerControlled: true, textureCache, detail: originDetail, pointLight: false }); lotusAnchor.add(lotus.group); pond.invalidate();
         boat.lotusMount.remove(deckLotus.group); deckLotus.dispose(); disposeMeshes(deckLotus.group);
         boat.dispose(); disposeMeshes(boat.group); scene.remove(boat.group);
-        boat = createSailboat(renderer, currentPalette); scene.add(boat.group);
-        deckLotus = createBoatLotus(renderer, currentPalette); boat.lotusMount.add(deckLotus.group);
+        boat = createSailboat(renderer, currentPalette, { textureCache }); scene.add(boat.group);
+        deckLotus = createBoatLotus(renderer, currentPalette, { textureCache, detail: 'medium' }); boat.lotusMount.add(deckLotus.group);
       }
       if (o.playing) t += dt * o.speed;
       opening = THREE.MathUtils.damp(opening, o.bloom, 5, dt);
       lotusAnchor.position.set(o.layout.lotus.x, o.layout.lotus.y, o.layout.lotus.z);
-      lotusAnchor.visible = o.layout.lotus.visible;
+      lotusAnchor.visible = o.layout.lotus.visible && camera.position.distanceToSquared(lotusAnchor.position) < 10000;
       if (energyLayout !== o.layout) {
         const definitions = [{ ...createWaterLotus({ ...o.layout.lotus, id: 'water-lotus', name: 'Loto de origen', palette: currentPalette }), y: o.layout.lotus.y }, ...(o.layout.lotuses || [])];
         const previous = new Map(waterLotuses.map(item => [item.id, item]));
@@ -155,26 +177,7 @@ export function Garden(props) {
           return { ...definition, signature, energy: old?.signature === signature && Number.isFinite(old.energy)
             ? Math.max(0, Math.min(definition.capacity, old.energy)) : definition.energy };
         });
-        for (const [id, entity] of waterEntities) {
-          if (!definitions.some(item => item.id === id && JSON.stringify(item) === entity.signature)) {
-            entity.flower?.dispose(); disposeMeshes(entity.group); scene.remove(entity.group); waterEntities.delete(id);
-          }
-        }
-        for (const definition of definitions.slice(1)) if (!waterEntities.has(definition.id)) {
-          const scale = definition.diameter / LOTUS_REFERENCE_DIAMETER;
-          const group = new THREE.Group(); group.scale.setScalar(scale); scene.add(group);
-          const shape = new THREE.Shape();
-          for (let i = 0; i <= 36; i++) {
-            const angle = i / 36 * Math.PI * 2, radius = i % 2 ? 1.3 : 3.1;
-            if (!i) shape.moveTo(Math.cos(angle)*radius, Math.sin(angle)*radius);
-            else shape.lineTo(Math.cos(angle)*radius, Math.sin(angle)*radius);
-          }
-          const proxy = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshStandardMaterial({
-            side: THREE.DoubleSide, roughness: .6, emissive: '#f9b65c', emissiveIntensity: 0,
-          }));
-          proxy.rotation.x = -Math.PI/2; proxy.position.y = .1; group.add(proxy);
-          waterEntities.set(definition.id, { group, flower: null, proxy, scale, signature: JSON.stringify(definition) });
-        }
+        fieldLotuses = waterLotuses;
         energyLayout = o.layout;
       }
       sailing.update(dt, o.boatSpeed, o.playing && !o.suspended);
@@ -185,28 +188,14 @@ export function Garden(props) {
       const activeSeconds = o.playing && !o.suspended ? Math.max(0, elapsed) : 0;
       stepEnergy(resonance, waterLotuses, boatState.position, activeSeconds);
       const stats = boatStats(resonance), charge = resonance.energy / stats.capacity;
-      for (const item of waterLotuses) {
-        const entity = item.id === 'water-lotus' ? { flower: lotus, group: lotusAnchor } : waterEntities.get(item.id);
-        entity.group.position.set(item.x, item.y, item.z); entity.group.visible = item.visible;
-        const fraction = item.energy / item.capacity;
-        if (entity.proxy) {
-          const distance = camera.position.distanceTo(entity.group.position);
-          if (item.visible && distance < 110 && !entity.flower) {
-            entity.flower = createLivingLotus(item.palette, renderer, entity.scale, { powerControlled: true });
-            entity.group.add(entity.flower.group);
-          } else if ((!item.visible || distance > 145) && entity.flower) {
-            entity.flower.dispose(); disposeMeshes(entity.flower.group); entity.group.remove(entity.flower.group); entity.flower = null;
-          }
-          entity.proxy.visible = !entity.flower;
-          entity.proxy.material.color.set('#b0b0b0').lerp(new THREE.Color({ ember: '#ef633e', sakura: '#eca3bd', moon: '#b7b1ee' }[item.palette]), fraction);
-          entity.proxy.material.emissiveIntensity = fraction * .8;
-        }
-        if (entity.flower) {
-          entity.flower.setSaturation(fraction);
-          if (item.visible) entity.flower.update(t, item.id === 'water-lotus' ? opening : .85, fraction);
-        }
-        if (item.id === 'water-lotus') { dust.material.opacity = fraction * .65; }
-      }
+      const originPower = waterLotuses[0].energy / waterLotuses[0].capacity;
+      originLight.position.copy(lotusAnchor.position); originLight.position.y += .9 * LOTUS_SCALE;
+      originLight.color.set({ ember: '#ff692b', sakura: '#f6a0a4', moon: '#d1abe7' }[currentPalette]);
+      originLight.intensity = o.layout.lotus.visible ? originPower * 18 * LOTUS_SCALE ** 2 : 0;
+      lotus.setSaturation(originPower);
+      if (lotusAnchor.visible) lotus.update(t, opening, originPower);
+      dust.material.opacity = originPower * .65;
+      field.update(fieldLotuses, camera, t, now, detailBudget, lotusAnchor.visible ? 'water-lotus' : null);
       const targetScale = stats.scale;
       deckLotus.group.scale.setScalar(THREE.MathUtils.damp(deckLotus.group.scale.x, targetScale, 3, dt));
       deckLotus.update(t, charge); boat.setEnergy(charge);
@@ -219,7 +208,7 @@ export function Garden(props) {
       electricLink.update(t, previousSource ? (resonance.linkRole === 'taker' ? linkTarget : linkSource) : null,
         resonance.linkRole === 'taker' ? linkSource : linkTarget, resonance.linkOpacity);
       saveElapsed += activeSeconds;
-      if (saveElapsed >= 1) { saveEnergy(); saveElapsed = 0; }
+      if (saveElapsed >= 5) { saveEnergy(); saveElapsed = 0; }
       wake.update(o.playing ? dt : 0, t, boatState, o.night, navigating && !o.suspended && o.playing);
       destinationMarker.visible = navigating && !!boatState.destination;
       if (boatState.destination) {
@@ -234,10 +223,10 @@ export function Garden(props) {
       pond.update(t, o.night, dt, opening, o.layout.lotus);
       if (controls.enabled) controls.update(dt); else if (editing) flight.update(dt, o.flightSpeed);
       guides.update(o, camera);
-      renderer.render(scene, camera);
-      if (now - lastHud > 150) {
-        o.onCameraPosition({ x: camera.position.x, y: camera.position.y, z: camera.position.z }); lastHud = now;
-        o.onBoatState({ x: boatState.position.x, z: boatState.position.z, heading: boatState.heading,
+      renderer.info.reset(); renderer.render(scene, camera);
+      if (now - lastHud > 250) {
+        if (editing) o.onCameraPosition({ x: camera.position.x, y: camera.position.y, z: camera.position.z }); lastHud = now;
+        if (navigating) o.onBoatState({ x: boatState.position.x, z: boatState.position.z, heading: boatState.heading,
           speed: o.playing && navigating ? boatState.velocity.length() : 0, distance: boatState.distance,
           energy: { charge, units: resonance.energy, capacity: stats.capacity, level: resonance.level,
             delivered: resonance.delivered, restored: resonance.restored, nextThreshold: BOAT_LEVELS[resonance.level]?.threshold,
@@ -247,11 +236,12 @@ export function Garden(props) {
               energy: item.energy, capacity: item.capacity, x: item.x, z: item.z, size: item.size })) },
           destination: boatState.destination ? { x: boatState.destination.x, z: boatState.destination.z } : null });
       }
-      if (elapsed > 0 && elapsed < .25) { sampleTime += elapsed; sampleFrames++; }
+      if (elapsed > 0) { sampleTime += Math.min(elapsed, 1); sampleFrames++; }
       if (sampleTime >= 2) {
-        const fps = sampleFrames / sampleTime, current = renderer.getPixelRatio(); let next = current;
-        if (fps < 55) { next = Math.max(Math.min(1, maxPixelRatio), current - .15); stableWindows = 0; }
-        else if (fps > 58) { if (++stableWindows >= 3) { next = Math.min(maxPixelRatio, current + .1); stableWindows = 0; } }
+        const fps = sampleFrames / sampleTime; measuredFps = fps;
+        const current = renderer.getPixelRatio(); let next = current;
+        if (fps < 55) { next = Math.max(Math.min(.65, pixelCeiling), current - .15); if (fps < 35) detailBudget = 1; stableWindows = 0; }
+        else if (fps > 58) { if (++stableWindows >= 3) { next = Math.min(pixelCeiling, current + .1); detailBudget = 3; stableWindows = 0; } }
         else stableWindows = 0;
         if (Math.abs(next - current) > .01) renderer.setPixelRatio(next);
         sampleTime = 0; sampleFrames = 0;
@@ -261,10 +251,12 @@ export function Garden(props) {
     return () => {
       saveEnergy();
       window.removeEventListener('pagehide', saveEnergy);
-      waterEntities.forEach(entity => entity.flower?.dispose());
+      field.dispose(); scene.remove(field.group);
       cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', resetTiming);
+      renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
+      renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
       observer.disconnect(); sailing.dispose(); flight.dispose(); controls.dispose(); lotus.dispose(); deckLotus.dispose(); boat.dispose(); pond.dispose();
-      disposeMeshes(scene); renderer.dispose(); el.removeChild(renderer.domElement); props.sceneRef.current = null;
+      disposeMeshes(scene); textureCache.dispose(); renderer.dispose(); el.removeChild(renderer.domElement); props.sceneRef.current = null;
     };
   }, []);
   return <div ref={host} className="garden-canvas"/>;

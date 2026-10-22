@@ -121,6 +121,33 @@ export function petalMaps(palette, variant, anisotropy) {
   return { map, bumpMap };
 }
 
+// Owned by one scene: repeated flowers and sail materials reuse the same
+// procedural pixels and GPU textures until that scene is disposed.
+export function createLotusTextureCache() {
+  const entries = new Map();
+  return {
+    ready(palette, anisotropy) {
+      return Array.from({ length: 6 }, (_, variant) => `${palette}:${variant}:${anisotropy}`).every(key => entries.has(key));
+    },
+    warmOne(palette, anisotropy) {
+      for (let variant = 0; variant < 6; variant++) {
+        const key = `${palette}:${variant}:${anisotropy}`;
+        if (!entries.has(key)) { entries.set(key, petalMaps(palette, variant, anisotropy)); break; }
+      }
+    },
+    get(palette, variant, anisotropy) {
+      const key = `${palette}:${variant}:${anisotropy}`;
+      if (!entries.has(key)) entries.set(key, petalMaps(palette, variant, anisotropy));
+      return entries.get(key);
+    },
+    get size() { return entries.size; },
+    dispose() {
+      entries.forEach(({ map, bumpMap }) => { map.dispose(); bumpMap.dispose(); });
+      entries.clear();
+    },
+  };
+}
+
 /** A closed, cupped petal with rounded edges, a fine tip and smooth skinning. */
 export function createPetalGeometry({ length, width, phase, segments = 18, rows = 96, columns = 24 }) {
   const positions = [], uvs = [], indices = [], skinIndices = [], weights = [], colors = [];
@@ -176,7 +203,7 @@ export function createPetalGeometry({ length, width, phase, segments = 18, rows 
 }
 
 function makePetal(config, material) {
-  const segments = 18;
+  const segments = config.segments ?? 18;
   const geometry = createPetalGeometry({ ...config, segments });
   const mesh = new THREE.SkinnedMesh(geometry, material);
   const bones = [];
@@ -231,18 +258,19 @@ function animatePetal(petal, time, bloom, wind) {
   petal.pivot.rotation.y = petal.angle + Math.sin(time * frequency * .41 + phase) * .045 + wind.strength * acrossWind * .018;
 }
 
-export function createLivingLotus(palette, renderer, worldScale = 1, { powerControlled = false } = {}) {
+export function createLivingLotus(palette, renderer, worldScale = 1, { powerControlled = false, detail = 'high', pointLight = true, textureCache } = {}) {
   const group = new THREE.Group();
   group.name = 'Flamming Lotus';
   const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const textures = [], materials = [], petals = [];
   for (let variant = 0; variant < 6; variant++) {
-    const { map, bumpMap } = petalMaps(palette, variant, anisotropy);
-    textures.push(map, bumpMap);
-    materials.push(addInkOutline(new THREE.MeshPhysicalMaterial({
+    const { map, bumpMap } = textureCache ? textureCache.get(palette, variant, anisotropy) : petalMaps(palette, variant, anisotropy);
+    if (!textureCache) textures.push(map, bumpMap);
+    const Material = detail === 'high' ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+    materials.push(addInkOutline(new Material({
       map, bumpMap, bumpScale: .022, vertexColors: true,
-      roughness: .53, metalness: 0, clearcoat: 0,
-      sheen: .65, sheenRoughness: .7, sheenColor: new THREE.Color(COLORS[palette][4]),
+      roughness: .53, metalness: 0,
+      ...(detail === 'high' ? { sheen: .65, sheenRoughness: .7, sheenColor: new THREE.Color(COLORS[palette][4]) } : {}),
       emissive: new THREE.Color(COLORS[palette][2]), emissiveMap: map, emissiveIntensity: .055,
       side: THREE.FrontSide,
     }), palette, variant));
@@ -258,6 +286,7 @@ export function createLivingLotus(palette, renderer, worldScale = 1, { powerCont
       phase: i * 2.39996, arch: .65 + noise(i, 1, 3) * .45,
       curl: curls[i], lean: -.13 - noise(i, 2, 8) * .18,
       twist: .35 + noise(i, 0, 1) * .65, frequency: .63 + noise(i, 0, 7) * .42,
+      ...(detail === 'high' ? {} : { rows: 28, columns: 10, segments: 8 }),
     }, materials[i % 6]));
   }
   // Shorter layers preserve the lotus identity beneath the long flame petals.
@@ -271,7 +300,8 @@ export function createLivingLotus(palette, renderer, worldScale = 1, { powerCont
         height: layer ? .37 : .05, phase: i * 1.71 + layer * 3.5,
         arch: layer ? .48 : .30, curl: layer ? -.24 : .35,
         lean: layer ? -.83 : .04, twist: .22, frequency: .72 + i * .037,
-        rows: 72,
+        rows: detail === 'high' ? 72 : 20,
+        ...(detail === 'high' ? {} : { columns: 10, segments: 8 }),
       }, materials[(i + layer + 2) % 6]));
     }
   }
@@ -279,7 +309,7 @@ export function createLivingLotus(palette, renderer, worldScale = 1, { powerCont
 
   // A small calyx meets the waterline so the blossom has a visible support.
   const calyx = new THREE.Mesh(
-    new THREE.SphereGeometry(.34, 32, 20),
+    new THREE.SphereGeometry(.34, detail === 'high' ? 32 : 12, detail === 'high' ? 20 : 8),
     new THREE.MeshStandardMaterial({ color: '#526e44', roughness: .72 }),
   );
   calyx.scale.y = .27;
@@ -287,11 +317,11 @@ export function createLivingLotus(palette, renderer, worldScale = 1, { powerCont
   group.add(calyx);
 
   const heart = new THREE.Mesh(
-    new THREE.SphereGeometry(.31, 40, 24),
+    new THREE.SphereGeometry(.31, detail === 'high' ? 40 : 16, detail === 'high' ? 24 : 10),
     new THREE.MeshStandardMaterial({ color: '#df9d4b', roughness: .6, emissive: '#e9782c', emissiveIntensity: .19 }),
   );
   heart.scale.y = .52; heart.position.y = .61; group.add(heart);
-  const pollenGeometry = new THREE.SphereGeometry(.028, 12, 8);
+  const pollenGeometry = new THREE.SphereGeometry(.028, detail === 'high' ? 12 : 6, detail === 'high' ? 8 : 4);
   const pollenMaterial = new THREE.MeshStandardMaterial({ color: '#ffe7a1', roughness: .35, emissive: '#ffae43', emissiveIntensity: .5 });
   const pollen = new THREE.InstancedMesh(pollenGeometry, pollenMaterial, 72);
   const dummy = new THREE.Object3D();
@@ -303,9 +333,9 @@ export function createLivingLotus(palette, renderer, worldScale = 1, { powerCont
   }
   group.add(pollen);
   const heartLight = new THREE.PointLight(COLORS[palette][3], .65 * worldScale ** 2, 3 * worldScale, 2);
-  heartLight.position.y = .9; group.add(heartLight);
+  heartLight.position.y = .9; if (pointLight) group.add(heartLight);
 
-  const magic = createLotusMagic(COLORS[palette]);
+  const magic = createLotusMagic(COLORS[palette], { detail });
   group.add(magic.group);
   const saturation = { value: 1 };
   materials.forEach(material => { material.userData.saturation = saturation; });

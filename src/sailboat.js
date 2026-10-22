@@ -42,7 +42,7 @@ function deckTexture() {
   texture.magFilter = THREE.NearestFilter; return texture;
 }
 
-export function createSailboat(renderer, palette = 'ember') {
+export function createSailboat(renderer, palette = 'ember', { textureCache } = {}) {
   const group = new THREE.Group(); group.name = 'Velero — Espíritu de seda';
   group.userData = { entityId: 'sailboat', entityType: 'vehicle', role: 'transport' };
   const textures = [];
@@ -110,7 +110,9 @@ export function createSailboat(renderer, palette = 'ember') {
   tube([new THREE.Vector3(0, 4.8, -.25), new THREE.Vector3(0, 2.6, 1), new THREE.Vector3(0, .7, 2.1)], .009, rope);
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(.032, .045, 2.9, 10), timber);
   boom.rotation.z = Math.PI / 2; boom.position.set(1.25, 1.1, -.25); group.add(boom);
-  const { map, bumpMap } = petalMaps(palette, 1, Math.min(8, renderer.capabilities.getMaxAnisotropy())); textures.push(map, bumpMap);
+  const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const { map, bumpMap } = textureCache ? textureCache.get(palette, 1, anisotropy) : petalMaps(palette, 1, anisotropy);
+  if (!textureCache) textures.push(map, bumpMap);
   const sailMaterial = addInkOutline(new THREE.MeshPhysicalMaterial({
     map, bumpMap, bumpScale: .016, side: THREE.DoubleSide,
     roughness: .53, sheen: .65, sheenRoughness: .7, sheenColor: '#ffe1b4',

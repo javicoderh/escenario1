@@ -6,7 +6,7 @@ import { LOTUS_SCALE } from './lotus-scale.js';
 export const WATER_LEVEL = 0;
 
 export function createPond(initialNight = false) {
-  const resolution = 384;
+  const resolution = 256;
   const surface = new Reflector(new THREE.CircleGeometry(10000, 256), {
     textureWidth: resolution, textureHeight: resolution,
     multisample: 0, clipBias: .003, color: '#397568',
@@ -81,15 +81,11 @@ export function createPond(initialNight = false) {
 
         vec4 softReflection(vec2 uv, vec2 spread) {
           // A small Gaussian kernel softens the real reflection, including magic.
-          vec4 reflected = texture2D(tDiffuse, uv) * 0.20;
-          reflected += texture2D(tDiffuse, uv + vec2(spread.x, 0.0)) * 0.12;
-          reflected += texture2D(tDiffuse, uv - vec2(spread.x, 0.0)) * 0.12;
-          reflected += texture2D(tDiffuse, uv + vec2(0.0, spread.y)) * 0.12;
-          reflected += texture2D(tDiffuse, uv - vec2(0.0, spread.y)) * 0.12;
-          reflected += texture2D(tDiffuse, uv + spread) * 0.08;
-          reflected += texture2D(tDiffuse, uv - spread) * 0.08;
-          reflected += texture2D(tDiffuse, uv + vec2(spread.x, -spread.y)) * 0.08;
-          reflected += texture2D(tDiffuse, uv + vec2(-spread.x, spread.y)) * 0.08;
+          vec4 reflected = texture2D(tDiffuse, uv) * 0.36;
+          reflected += texture2D(tDiffuse, uv + vec2(spread.x, 0.0)) * 0.16;
+          reflected += texture2D(tDiffuse, uv - vec2(spread.x, 0.0)) * 0.16;
+          reflected += texture2D(tDiffuse, uv + vec2(0.0, spread.y)) * 0.16;
+          reflected += texture2D(tDiffuse, uv - vec2(0.0, spread.y)) * 0.16;
           return reflected;
         }
 
@@ -150,7 +146,8 @@ export function createPond(initialNight = false) {
   surface.add(underside);
 
   // The main scene remains uncapped; the blurred reflection needs fewer updates.
-  // Camera movement and lighting changes always refresh it immediately.
+  // Movement also respects the cap: a following camera otherwise doubles the
+  // render workload on every frame, including all skeletons and transparent FX.
   const reflect = surface.onBeforeRender;
   const cameraWorld = new THREE.Matrix4(), cameraProjection = new THREE.Matrix4();
   let lastReflection = -Infinity, dirty = true, lastTime = -1, lastNight = -1;
@@ -160,7 +157,8 @@ export function createPond(initialNight = false) {
     const uniforms = surface.material.uniforms;
     const lightingChanged = Math.abs(uniforms.uNight.value - lastNight) > .008;
     const animationChanged = uniforms.uTime.value !== lastTime;
-    if (!dirty && !moved && !lightingChanged && (!animationChanged || now - lastReflection < 1000 / 30)) return;
+    if (now - lastReflection < 1000 / 15) return;
+    if (!dirty && !moved && !lightingChanged && !animationChanged) return;
     reflect.call(this, renderer, scene, camera);
     cameraWorld.copy(camera.matrixWorld); cameraProjection.copy(camera.projectionMatrix);
     lastReflection = now; lastTime = uniforms.uTime.value; lastNight = uniforms.uNight.value;

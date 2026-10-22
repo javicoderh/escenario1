@@ -4,6 +4,8 @@ import { LEVELS } from './world-layout.js';
 export function disposeMeshes(group) {
   const geometries = new Set(), materials = new Set();
   group.traverse(object => {
+    // Instance matrices/colors have separate GPU buffers from the geometry.
+    if (object.isInstancedMesh) object.dispose();
     if (object.geometry) geometries.add(object.geometry);
     if (object.material) (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => materials.add(material));
   });

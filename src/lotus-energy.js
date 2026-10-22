@@ -39,13 +39,20 @@ export function stepEnergy(state, lotuses, position, seconds) {
     const eligible = lotus => lotus.visible && lotus.y === 0 && Math.hypot(lotus.x-position.x, lotus.z-position.z) <= lotus.range
       && (lotus.energyRole === 'giver' ? lotus.energy > 1e-8
         : lotus.energy < lotus.capacity - 1e-8 && state.energy > 1e-8);
-    const candidates = lotuses.filter(eligible).sort((a,b) => Math.hypot(a.x-position.x,a.z-position.z)-Math.hypot(b.x-position.x,b.z-position.z));
     const stats = boatStats(state);
-    let active = candidates.find(lotus => lotus.id === state.linkId) || candidates[0];
+    let current, nearest, nearestTaker, nearestDistance=Infinity, takerDistance=Infinity;
+    for (const lotus of lotuses) {
+      if (!eligible(lotus)) continue;
+      const distance=(lotus.x-position.x)**2+(lotus.z-position.z)**2;
+      if (lotus.id === state.linkId) current=lotus;
+      if (distance < nearestDistance) { nearest=lotus; nearestDistance=distance; }
+      if (lotus.energyRole === 'taker' && distance < takerDistance) { nearestTaker=lotus; takerDistance=distance; }
+    }
+    let active = current || nearest;
     // A full boat can hand its link to a nearby receiver instead of being held
     // indefinitely by an overlapping source that cannot transfer any more.
     if (active?.energyRole === 'giver' && state.energy >= stats.capacity - 1e-8)
-      active = candidates.find(lotus => lotus.energyRole === 'taker') || active;
+      active = nearestTaker || active;
     if (active) {
       const giver = active.energyRole === 'giver';
       const amount = Math.min(active.rate * dt, giver ? active.energy : state.energy,

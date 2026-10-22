@@ -12,7 +12,7 @@ const hash = seed => {
   return value - Math.floor(value);
 };
 
-export function createLotusMagic(palette) {
+export function createLotusMagic(palette, { detail = 'high' } = {}) {
   const group = new THREE.Group();
   group.name = 'Nen aura and living spores';
   const colors = palette.map(color => new THREE.Color(color));
@@ -81,7 +81,7 @@ export function createLotusMagic(palette) {
       }
     `,
   });
-  const aura = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 48), auraMaterial);
+  const aura = new THREE.Mesh(new THREE.SphereGeometry(1, detail === 'high' ? 96 : 24, detail === 'high' ? 48 : 16), auraMaterial);
   aura.position.y = 1.75;
   aura.renderOrder = 2;
   aura.frustumCulled = false;
@@ -121,7 +121,7 @@ export function createLotusMagic(palette) {
 
   // Instanced camera-facing quads allow varied sizes without point-size limits.
   // Position, lifetime, drift, twinkle and fading are evaluated entirely on the GPU.
-  const count = 128;
+  const count = detail === 'high' ? 128 : 32;
   const geometry = new THREE.InstancedBufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute([-.5,-.5,0, .5,-.5,0, .5,.5,0, -.5,.5,0], 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0,0, 1,0, 1,1, 0,1], 2));

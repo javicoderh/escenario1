@@ -110,9 +110,19 @@ Los contornos de tinta, inspirados en Ōkami, se dibujan en el material de cada 
 
 La paleta inicial Fuego combina rojos, naranjos y amarillos. El aura forma lenguas irregulares que ascienden, se estiran y responden al viento. Del centro nacen 128 esporas luminosas repartidas entre dorado, zafiro, rubí y esmeralda, con pequeñas variaciones de tono y brillo dentro de cada familia. Ascienden en espiral y se desvanecen. Aura, halo y esporas utilizan tres llamadas de dibujo, con animación de las partículas en GPU y sin posprocesado de pantalla completa. Respetan la pausa y la velocidad de la animación.
 
-El loto descansa sobre un estanque verde jade con saturación moderada, ondas procedurales, pequeños brillos y sombra de contacto. El reflejo real de la escena se difumina y deforma con las ondas; se calcula a 384 × 384 y hasta 30 veces por segundo mientras la cámara está quieta, sin limitar el refresco de la escena principal. La base de la flor y las hojas flotan suavemente junto a la superficie, y el agua adapta su iluminación al modo nocturno.
+El loto descansa sobre un estanque verde jade con saturación moderada, ondas procedurales, pequeños brillos y sombra de contacto. El reflejo real de la escena se difumina y deforma con las ondas; se calcula a 256 × 256 y hasta 15 veces por segundo, también al mover la cámara, sin limitar el refresco de la escena principal. La base de la flor y las hojas flotan suavemente junto a la superficie, y el agua adapta su iluminación al modo nocturno.
 
 La escena comienza en una noche despejada de luna llena, con textura lunar, halo tenue, estrellas de distintos brillos y centelleo suave. La luz lunar ilumina los pétalos y deja un reflejo plateado en el estanque. El cielo y las estrellas se dibujan en una sola pasada. Las texturas y paletas originales de los pétalos conservan sus colores. El selector de atmósfera permite alternar entre Luna llena y Ocaso; la pausa detiene también el centelleo.
+
+## Rendimiento y estabilidad
+
+Los lotos lejanos comparten dos llamadas de dibujo por pasada: flores y halos mediante `InstancedMesh`. Un pool de hasta tres flores cercanas reutiliza modelos con menos geometría y articulaciones, animados a 30 Hz. Ninguna flor del pool añade luces; la cantidad de luces de la escena se mantiene estable para evitar recompilar materiales durante el recorrido. El loto de origen usa detalle medio al navegar/construir y conserva el modelo completo en Contemplar loto.
+
+Las texturas procedurales se comparten por paleta y variante, con un máximo de 18 pares por escena. Preparar una paleta nueva se reparte entre cuadros. Al reemplazar modelos se liberan esqueletos, geometrías, materiales y buffers de instancias; las texturas compartidas se liberan al cerrar la escena. Cambiar el detalle de un loto no modifica su energía ni su estado de restauración.
+
+La densidad de píxeles se adapta normalmente entre 0,65 y 1,25, con un techo de 1,6 millones de píxeles que puede reducirla más en pantallas grandes; equipos lentos reducen el pool cercano a una flor. La interfaz recibe actualizaciones a 4 Hz y el progreso se guarda cada cinco segundos y al salir. Una pérdida del contexto WebGL suspende la simulación y permite restaurar la escena sin contabilizar el tiempo perdido como consumo de energía.
+
+`sceneRef.current.getPerformance()` expone FPS, densidad de píxeles, flores detalladas, llamadas de dibujo, triángulos, geometrías, texturas y programas para diagnóstico. Las pruebas cubren el límite del pool, la reducción de geometría, las texturas compartidas y la conservación de color/aura con el renderizado por instancias.
 
 ## Desarrollo
 
