@@ -3,6 +3,7 @@ import { createLivingLotus } from './lotus.js';
 import { LOTUS_REFERENCE_DIAMETER } from './lotus-scale.js';
 import { MAX_WATER_LOTUSES } from './world-zones.js';
 import { disposeMeshes } from './world-guides.js';
+import { sampleOcean } from './ocean-waves.js';
 
 export const MAX_DETAILED_LOTUSES = 3;
 
@@ -47,6 +48,16 @@ export function createLotusField(renderer, textureCache) {
   const colors={ember:new THREE.Color('#ef633e'),sakura:new THREE.Color('#eca3bd'),moon:new THREE.Color('#b7b1ee')};
   const gray=new THREE.Color('#b0b0b0'), color=new THREE.Color(), dummy=new THREE.Object3D();
   const frustum=new THREE.Frustum(), matrix=new THREE.Matrix4(), sphere=new THREE.Sphere();
+  const water = {}, up = new THREE.Vector3(0, 1, 0), waterNormal = new THREE.Vector3();
+  const flat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+  function floatOnWater(object, item, time, offset = 0, horizontal = false) {
+    if (item.y === 0) sampleOcean(item.x, item.z, time, water);
+    else { water.height = water.slopeX = water.slopeZ = 0; }
+    object.position.set(item.x, item.y + water.height + offset, item.z);
+    waterNormal.set(-water.slopeX, 1, -water.slopeZ).normalize();
+    object.quaternion.setFromUnitVectors(up, waterNormal);
+    if (horizontal) object.quaternion.multiply(flat);
+  }
   let lastModels=-Infinity,lastInstances=-Infinity,lastBuild=-Infinity,lastPose=-Infinity,layout=null,selected=[],assignments=[];
   function disposeSlot(slot) {
     if (!slot.flower) return;
@@ -85,22 +96,22 @@ export function createLotusField(renderer, textureCache) {
         for(const slot of assignments) {
           const item=slot.item,power=item.energy/item.capacity;
           const restored=item.energyRole==='taker' && power>=1-1e-8;
-          slot.group.position.set(item.x,item.y,item.z); slot.group.scale.setScalar(item.diameter/LOTUS_REFERENCE_DIAMETER);
+          floatOnWater(slot.group,item,time); slot.group.scale.setScalar(item.diameter/LOTUS_REFERENCE_DIAMETER);
           slot.flower.setSaturation(restored ? 1.15 : power); slot.flower.update(time,.85,power,restored);
         }
         lastPose=now;
       }
-      if(changed || now-lastInstances>=100) {
+      if(changed || now-lastInstances>=1000/30) {
         const detailed=new Set(assignments.map(slot=>slot.id));
         flowers.count=halos.count=Math.min(lotuses.length,MAX_WATER_LOTUSES);
         for(let i=0;i<flowers.count;i++) {
           const item=lotuses[i],power=item.energy/item.capacity, visible=item.visible && item.id !== heroId && !detailed.has(item.id);
           const restored=item.energyRole==='taker' && power>=1-1e-8;
-          dummy.position.set(item.x,item.y+.04,item.z); dummy.rotation.set(-Math.PI/2,0,0); dummy.scale.setScalar(visible?item.diameter:0);
+          floatOnWater(dummy,item,time,.04,true); dummy.scale.setScalar(visible?item.diameter:0);
           dummy.updateMatrix(); flowers.setMatrixAt(i,dummy.matrix);
           color.copy(gray).lerp(colors[item.palette],power); flowers.setColorAt(i,color);
           if(restored) { color.offsetHSL(0,.15,.05); flowers.setColorAt(i,color); }
-          dummy.position.y=item.y+.06; dummy.scale.setScalar(visible?item.diameter*1.5:0); dummy.updateMatrix(); halos.setMatrixAt(i,dummy.matrix);
+          dummy.position.y+=.02; dummy.scale.setScalar(visible?item.diameter*1.5:0); dummy.updateMatrix(); halos.setMatrixAt(i,dummy.matrix);
           halos.setColorAt(i,colors[item.palette]); powers.setX(i,visible?power*(restored?2.4:1):0);
         }
         flowers.instanceMatrix.needsUpdate=true; halos.instanceMatrix.needsUpdate=true;

@@ -27,7 +27,7 @@ export function SailingPanel({ boatState, boatSpeed, setBoatSpeed, sceneRef, nig
       </div>)}
     </section>
     <div className="sailing-destination" role="status">{boatState.destination?<><span>RUMBO AL DESTINO</span><strong>{boatState.destination.x.toFixed(1)}, {boatState.destination.z.toFixed(1)} m</strong><small>{Math.hypot(boatState.x-boatState.destination.x,boatState.z-boatState.destination.z).toFixed(1)} m por recorrer</small></>:<><span>EL MAR ES TU CAMINO</span><strong>{boatState.speed > .1 ? 'Al timón' : 'A la espera'}</strong><small>Clic derecho sobre el mar para navegar.</small></>}</div>
-    <label className="editor-field">Velocidad base <span>{boatSpeed} m/s</span><input type="range" aria-label="Velocidad base del velero" min="0.5" max="12" step="0.5" value={boatSpeed} onChange={event=>setBoatSpeed(Number(event.target.value))}/></label>
+    <label className="editor-field">Velocidad base <span>{boatSpeed} m/s</span><input type="range" aria-label="Velocidad base del velero" min="0.5" max="12" step="0.1" value={boatSpeed} onChange={event=>setBoatSpeed(Number(event.target.value))}/></label>
     <p className="editor-hint">Impulso por carga: ×{(1 + energy.charge).toFixed(2)} · Hasta {(boatState.maxSpeed || boatSpeed).toFixed(1)} m/s</p>
     <div className="sailing-instructions"><kbd>W</kbd><div><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><p>Mover respecto a la cámara<br/>Clic derecho: marcar destino<br/>Arrastrar: girar la vista · Rueda: zoom<br/>Esc: detener el velero</p></div>
     <div className="editor-actions"><button onClick={()=>sceneRef.current?.stopBoat()}>Detener velero</button><button onClick={()=>sceneRef.current?.focusBoat()}>Centrar cámara</button></div>

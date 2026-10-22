@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { WORLD_RADIUS } from './world-layout.js';
 
-export const BOAT_SPEED = 4;
+export const BOAT_SPEED = 4.8;
 export const BOAT_RADIUS = 2.5;
 export const NAVIGATION_RADIUS = WORLD_RADIUS - BOAT_RADIUS;
 

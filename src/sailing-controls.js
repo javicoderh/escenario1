@@ -7,6 +7,7 @@ export function createSailingControls(camera, canvas, lotus, onStatus) {
   const hit = new THREE.Vector3(), mouse = new THREE.Vector2(), cameraTarget = new THREE.Vector3(), desiredCamera = new THREE.Vector3();
   let enabled = false, dragging = false, lastX = 0, lastY = 0, idleLook = 10;
   let yaw = state.heading + .25, pitch = .32, distance = 12, desiredDistance = 12;
+  let surfaceHeight = 0, cameraHeight = 0;
   const clear = () => { keys.clear(); dragging = false; };
   const keydown = event => {
     if (!enabled || document.activeElement !== canvas) return;
@@ -69,14 +70,16 @@ export function createSailingControls(camera, canvas, lotus, onStatus) {
       yaw += difference * (1 - Math.exp(-1.8 * dt));
     }
     distance = THREE.MathUtils.damp(distance, desiredDistance, 10, dt);
-    cameraTarget.set(state.position.x, 1.6, state.position.z);
+    cameraHeight = snap ? surfaceHeight * .65 : THREE.MathUtils.damp(cameraHeight, surfaceHeight * .65, 3, dt);
+    cameraTarget.set(state.position.x, 1.6 + cameraHeight, state.position.z);
     desiredCamera.set(state.position.x + Math.sin(yaw) * Math.cos(pitch) * distance,
-      1.6 + Math.sin(pitch) * distance, state.position.z + Math.cos(yaw) * Math.cos(pitch) * distance);
+      1.6 + cameraHeight + Math.sin(pitch) * distance, state.position.z + Math.cos(yaw) * Math.cos(pitch) * distance);
     if (snap) camera.position.copy(desiredCamera); else camera.position.lerp(desiredCamera, 1 - Math.exp(-7 * dt));
     camera.lookAt(cameraTarget); camera.updateMatrixWorld();
   }
   return {
     state, stop,
+    setSurfaceHeight(height) { surfaceHeight = height; },
     focus() { yaw = state.heading + .25; pitch = .32; idleLook = 0; updateCamera(1, true); },
     returnToLotus(point) {
       const initial = createBoatState(point); Object.assign(state, initial); stop(); this.focus();

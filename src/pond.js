@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { SUN_DIRECTION, MOON_DIRECTION } from './atmosphere.js';
 import { LOTUS_SCALE } from './lotus-scale.js';
+import { OCEAN_GLSL } from './ocean-waves.js';
+import { createOceanGeometry } from './ocean-geometry.js';
 
 export const WATER_LEVEL = 0;
 
 export function createPond(initialNight = false) {
   const resolution = 256;
-  const surface = new Reflector(new THREE.CircleGeometry(10000, 256), {
+  const surface = new Reflector(createOceanGeometry(), {
     textureWidth: resolution, textureHeight: resolution,
     multisample: 0, clipBias: .003, color: '#397568',
     shader: {
@@ -16,6 +18,7 @@ export function createPond(initialNight = false) {
         THREE.UniformsLib.fog,
         {
           color: { value: null }, tDiffuse: { value: null }, textureMatrix: { value: null },
+          uWorldReflection: { value: new THREE.Matrix4() },
           uTime: { value: 0 }, uNight: { value: initialNight ? 1 : 0 },
           uLotusPosition: { value: new THREE.Vector2() }, uLotusVisible: { value: 0 },
           uLotusScale: { value: LOTUS_SCALE },
@@ -30,15 +33,19 @@ export function createPond(initialNight = false) {
         },
       ]),
       vertexShader: /* glsl */`
-        uniform mat4 textureMatrix;
+        uniform mat4 uWorldReflection;
+        uniform float uTime;
         varying vec4 vReflection;
         varying vec3 vWaterPosition;
         #include <common>
         #include <fog_pars_vertex>
+        ${OCEAN_GLSL}
         void main() {
-          vWaterPosition = (modelMatrix * vec4(position, 1.0)).xyz;
-          vReflection = textureMatrix * vec4(position, 1.0);
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          worldPosition.y += oceanSurface(worldPosition.xz, uTime).x;
+          vWaterPosition = worldPosition.xyz;
+          vReflection = uWorldReflection * worldPosition;
+          vec4 mvPosition = viewMatrix * worldPosition;
           gl_Position = projectionMatrix * mvPosition;
           #include <fog_vertex>
         }
@@ -63,14 +70,15 @@ export function createPond(initialNight = false) {
         varying vec3 vWaterPosition;
         #include <common>
         #include <fog_pars_fragment>
+        ${OCEAN_GLSL}
 
-        vec3 waterNormal(vec2 p) {
+        vec3 waterNormal(vec2 p, vec2 swellSlope) {
           vec2 a = vec2(0.85, 0.45);
           vec2 b = vec2(-0.4, 0.9);
           vec2 c = vec2(0.6, -0.8);
-          vec2 slope = a * (0.07 * cos(dot(p, a) * 2.0 + uTime * 0.65));
-          slope += b * (0.0612 * cos(dot(p, b) * 3.4 - uTime * 0.55));
-          slope += c * (0.042 * cos(dot(p, c) * 7.0 + uTime * 0.8));
+          vec2 slope = swellSlope + a * (0.032 * cos(dot(p, a) * 2.0 + uTime * 0.65));
+          slope += b * (0.026 * cos(dot(p, b) * 3.4 - uTime * 0.55));
+          slope += c * (0.018 * cos(dot(p, c) * 7.0 + uTime * 0.8));
           vec2 local = (p - uLotusPosition) / uLotusScale;
           float radius = length(local);
           float phase = radius * 9.0 - uTime * 1.35;
@@ -93,7 +101,8 @@ export function createPond(initialNight = false) {
           vec2 p = vWaterPosition.xz;
           vec2 local = (p - uLotusPosition) / uLotusScale;
           float radius = length(local);
-          vec3 normal = waterNormal(p);
+          vec3 swell = oceanSurface(p, uTime);
+          vec3 normal = waterNormal(p, swell.yz);
           vec3 viewDirection = normalize(cameraPosition - vWaterPosition);
           float facing = clamp(dot(normal, viewDirection), 0.0, 1.0);
           float fresnel = 0.035 + 0.965 * pow(1.0 - facing, 5.0);
@@ -104,6 +113,8 @@ export function createPond(initialNight = false) {
           vec3 skyTint = mix(uSky, uMoon * 0.62, uNight);
           base += skyTint * fresnel * 0.13;
           base *= mix(1.0, 0.43, uNight);
+          // Broad painted bands make passing crests legible in moonlight.
+          base *= 0.88 + 0.24 * smoothstep(-0.55, 0.55, swell.x);
 
           vec2 reflectionUV = vReflection.xy / max(vReflection.w, 0.0001);
           reflectionUV += normal.xz * (0.013 + fresnel * 0.008);
@@ -124,6 +135,9 @@ export function createPond(initialNight = false) {
           water += mix(uSun, uMoon, uNight) * sparkle * (1.0 - uNight * 0.35);
           float ripples = pow(max(0.0, sin(radius * 9.0 - uTime * 1.35)), 18.0);
           water += skyTint * ripples * exp(-radius * 0.52) * 0.025 * uLotusVisible;
+          float crest = smoothstep(0.25, 0.65, swell.x);
+          float brush = 0.65 + 0.35 * sin(p.x * 0.7 + p.y * 0.46);
+          water += skyTint * crest * brush * 0.032;
           float contact = exp(-dot(local, local) * 5.5) * 0.30 * uLotusVisible;
           water *= 1.0 - contact;
           gl_FragColor = vec4(water, 1.0);
@@ -134,15 +148,27 @@ export function createPond(initialNight = false) {
       `,
     },
   });
-  surface.name = 'Reflective lotus pond';
+  surface.name = 'Mar de fondo — oleaje compartido';
   surface.rotation.x = -Math.PI / 2;
   surface.position.y = WATER_LEVEL;
   surface.material.fog = true;
   surface.renderOrder = -1;
+  surface.frustumCulled = false;
   // Looking upward from the submerged levels sees the underside of the sea.
   const underside = new THREE.Mesh(surface.geometry, new THREE.MeshBasicMaterial({
     color: '#153c49', side: THREE.BackSide, fog: true,
   }));
+  underside.material.onBeforeCompile = shader => {
+    shader.uniforms.uTime = surface.material.uniforms.uTime;
+    shader.vertexShader = `uniform float uTime;\n${OCEAN_GLSL}\n` + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
+      vec3 transformed = position;
+      vec3 waterWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+      transformed.z += oceanSurface(waterWorld.xz, uTime).x;
+    `);
+  };
+  underside.material.customProgramCacheKey = () => 'ocean-underside-v1';
+  underside.frustumCulled = false;
   surface.add(underside);
 
   // The main scene remains uncapped; the blurred reflection needs fewer updates.
@@ -150,6 +176,7 @@ export function createPond(initialNight = false) {
   // render workload on every frame, including all skeletons and transparent FX.
   const reflect = surface.onBeforeRender;
   const cameraWorld = new THREE.Matrix4(), cameraProjection = new THREE.Matrix4();
+  const inverseSurface = new THREE.Matrix4();
   let lastReflection = -Infinity, dirty = true, lastTime = -1, lastNight = -1;
   surface.onBeforeRender = function(renderer, scene, camera) {
     const now = performance.now();
@@ -160,6 +187,9 @@ export function createPond(initialNight = false) {
     if (now - lastReflection < 1000 / 15) return;
     if (!dirty && !moved && !lightingChanged && !animationChanged) return;
     reflect.call(this, renderer, scene, camera);
+    // World-space projection stays aligned when the dense mesh follows the camera.
+    inverseSurface.copy(surface.matrixWorld).invert();
+    uniforms.uWorldReflection.value.copy(uniforms.textureMatrix.value).multiply(inverseSurface);
     cameraWorld.copy(camera.matrixWorld); cameraProjection.copy(camera.projectionMatrix);
     lastReflection = now; lastTime = uniforms.uTime.value; lastNight = uniforms.uNight.value;
     dirty = false;
@@ -167,9 +197,10 @@ export function createPond(initialNight = false) {
 
   return {
     surface,
-    update(time, night, dt, bloom, lotus) {
+    update(time, night, dt, bloom, lotus, camera) {
       const uniforms = surface.material.uniforms;
       uniforms.uTime.value = time;
+      if (camera) surface.position.set(camera.position.x, WATER_LEVEL, camera.position.z);
       uniforms.uNight.value = THREE.MathUtils.damp(uniforms.uNight.value, night ? 1 : 0, 4, dt);
       if (lotus) {
         if (uniforms.uLotusPosition.value.x !== lotus.x || uniforms.uLotusPosition.value.y !== lotus.z

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { addInkOutline, petalMaps } from './lotus.js';
 import { createBoatEnergy } from './boat-energy.js';
+import { createBoatBuoyancy } from './boat-buoyancy.js';
 
 function hullGeometry() {
   const positions = [], uvs = [], indices = [];
@@ -45,6 +46,8 @@ function deckTexture() {
 
 export function createSailboat(renderer, palette = 'ember', { textureCache } = {}) {
   const group = new THREE.Group(); group.name = 'Velero — Espíritu de seda';
+  group.rotation.order = 'YXZ';
+  const buoyancy = createBoatBuoyancy(); let previousTime = null;
   group.userData = { entityId: 'sailboat', entityType: 'vehicle', role: 'transport' };
   const textures = [];
   const wood = deckTexture(); textures.push(wood);
@@ -177,11 +180,11 @@ export function createSailboat(renderer, palette = 'ember', { textureCache } = {
       crestMaterial.emissiveIntensity = .2 + power * .65;
       lanternLight.intensity = .25 + power * .55;
     },
-    update(time, speed) {
+    update(time, speed, dt = previousTime === null ? 0 : Math.max(0, time - previousTime)) {
       timeUniform.value = time; electricity.update(time);
-      group.position.y = .08 + Math.sin(time * 1.35) * .045;
-      group.rotation.x = Math.sin(time * .95) * .018;
-      group.rotation.z = Math.sin(time * 1.2 + .7) * .025 - Math.min(speed / 4, 1) * .025;
+      const pose = buoyancy.update(group.position, group.rotation.y, time, dt, speed);
+      group.position.y = pose.height; group.rotation.x = pose.pitch; group.rotation.z = pose.roll;
+      previousTime = time;
       const positions = sailGeometry.attributes.position;
       for (let i = 0; i < positions.count; i++) {
         const u = sailGeometry.attributes.uv.getX(i), v = sailGeometry.attributes.uv.getY(i);

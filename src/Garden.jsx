@@ -18,6 +18,7 @@ import { LOTUS_REFERENCE_DIAMETER } from './lotus-scale.js';
 import { chargedBoatSpeed } from './boat-motion.js';
 import { pickWaterLotus } from './lotus-hover.js';
 import { LotusTooltip } from './LotusTooltip.jsx';
+import { oceanHeight, sampleOcean } from './ocean-waves.js';
 
 export function Garden(props) {
   const host = useRef(), options = useRef(props); options.current = props;
@@ -43,6 +44,8 @@ export function Garden(props) {
     const sailing = createSailingControls(camera, renderer.domElement, options.current.layout.lotus, message => options.current.onSailingStatus(message));
     const atmosphere = createAtmosphere(scene, options.current.night);
     const pond = createPond(options.current.night); scene.add(pond.surface);
+    let t = 0, lastLotusHeight = 0;
+    const lotusWater = {}, waterUp = new THREE.Vector3(0, 1, 0), lotusNormal = new THREE.Vector3();
     const guides = createWorldGuides(); scene.add(guides.group);
     const lotusAnchor = new THREE.Group(); scene.add(lotusAnchor);
     lotusAnchor.userData = { entityId: 'water-lotus', entityType: 'lotus', role: 'water-lotus' };
@@ -77,7 +80,7 @@ export function Garden(props) {
       const rect = renderer.domElement.getBoundingClientRect();
       hoverMouse.set((pointer.x - rect.left) / rect.width * 2 - 1, -(pointer.y - rect.top) / rect.height * 2 + 1);
       hoverRay.setFromCamera(hoverMouse, camera);
-      const item = pickWaterLotus(hoverRay.ray, waterLotuses);
+      const item = pickWaterLotus(hoverRay.ray, waterLotuses, t);
       if (!item) { if (hoverKey) { hoverKey = ''; setHover(null); } return; }
       const x = Math.max(8, Math.min(rect.width - 248, pointer.x - rect.left + 16));
       const y = Math.max(8, Math.min(rect.height - 150, pointer.y - rect.top + 16));
@@ -133,7 +136,8 @@ export function Garden(props) {
     }
     function focusLotus() {
       const p = options.current.layout.lotus;
-      pose(new THREE.Vector3(p.x + 5.8 * LOTUS_SCALE, p.y + 3.3 * LOTUS_SCALE, p.z + 10.6 * LOTUS_SCALE), new THREE.Vector3(p.x, p.y + 1.15 * LOTUS_SCALE, p.z));
+      const swell = p.y === 0 ? oceanHeight(p.x, p.z, t) : 0; lastLotusHeight = swell;
+      pose(new THREE.Vector3(p.x + 5.8 * LOTUS_SCALE, p.y + swell + 3.3 * LOTUS_SCALE, p.z + 10.6 * LOTUS_SCALE), new THREE.Vector3(p.x, p.y + swell + 1.15 * LOTUS_SCALE, p.z));
     }
     function overview() {
       const distance = 1100 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / Math.min(camera.aspect, 1);
@@ -151,6 +155,9 @@ export function Garden(props) {
       getPerformance: () => ({ fps: measuredFps, pixelRatio: renderer.getPixelRatio(), detailedLotuses: field.detailedCount,
         calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries,
         textures: renderer.info.memory.textures, programs: renderer.info.programs.length, contextLost }),
+      getSeaState: () => ({ time: t, boat: { x: boat.group.position.x, y: boat.group.position.y, z: boat.group.position.z,
+        pitch: boat.group.rotation.x, roll: boat.group.rotation.z, heading: boat.group.rotation.y },
+        waterHeight: oceanHeight(boat.group.position.x, boat.group.position.z, t) }),
       capture: () => { pond.invalidate(); renderer.info.reset(); renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); },
     };
     const resize = () => {
@@ -162,7 +169,7 @@ export function Garden(props) {
     const observer = new ResizeObserver(resize); observer.observe(el); resize();
     let editing = options.current.editing, navigating = options.current.navigating;
     if (navigating) sailing.focus(); else focusLotus();
-    let frame, t = 0, last = performance.now(), opening = options.current.bloom, lastHud = 0;
+    let frame, last = performance.now(), opening = options.current.bloom, lastHud = 0;
     let sampleTime = 0, sampleFrames = 0, stableWindows = 0;
     const resetTiming = () => { last = performance.now(); sampleTime = 0; sampleFrames = 0; stableWindows = 0; };
     document.addEventListener('visibilitychange', resetTiming);
@@ -196,9 +203,20 @@ export function Garden(props) {
         boat = createSailboat(renderer, currentPalette, { textureCache }); scene.add(boat.group);
         deckLotus = createBoatLotus(renderer, currentPalette, { textureCache, detail: 'medium' }); boat.lotusMount.add(deckLotus.group);
       }
-      if (o.playing) t += dt * o.speed;
+      const simulationDt = o.playing && !o.suspended ? dt * o.speed : 0;
+      t += simulationDt;
       opening = THREE.MathUtils.damp(opening, o.bloom, 5, dt);
-      lotusAnchor.position.set(o.layout.lotus.x, o.layout.lotus.y, o.layout.lotus.z);
+      const origin = o.layout.lotus;
+      if (origin.y === 0) sampleOcean(origin.x, origin.z, t, lotusWater);
+      else { lotusWater.height = lotusWater.slopeX = lotusWater.slopeZ = 0; }
+      lotusAnchor.position.set(origin.x, origin.y + lotusWater.height, origin.z);
+      lotusNormal.set(-lotusWater.slopeX, 1, -lotusWater.slopeZ).normalize();
+      lotusAnchor.quaternion.setFromUnitVectors(waterUp, lotusNormal);
+      if (controls.enabled) {
+        const rise = lotusWater.height - lastLotusHeight;
+        camera.position.y += rise; controls.target.y += rise;
+      }
+      lastLotusHeight = lotusWater.height;
       lotusAnchor.visible = o.layout.lotus.visible && camera.position.distanceToSquared(lotusAnchor.position) < 10000;
       if (energyLayout !== o.layout) {
         const definitions = [{ ...createWaterLotus({ ...o.layout.lotus, id: 'water-lotus', name: 'Loto de origen', palette: currentPalette }), y: o.layout.lotus.y }, ...(o.layout.lotuses || [])];
@@ -230,12 +248,14 @@ export function Garden(props) {
       field.update(fieldLotuses, camera, t, now, detailBudget, lotusAnchor.visible ? 'water-lotus' : null);
       const targetScale = stats.scale;
       deckLotus.group.scale.setScalar(THREE.MathUtils.damp(deckLotus.group.scale.x, targetScale, 3, dt));
-      deckLotus.update(t, charge); boat.setEnergy(charge); boat.update(t, boatState.velocity.length());
+      deckLotus.update(t, charge); boat.setEnergy(charge); boat.update(t, boatState.velocity.length(), simulationDt);
+      sailing.setSurfaceHeight(boat.group.position.y);
       deckLotus.getLinkPosition(linkTarget);
       const previousSource = resonance.linkPosition;
       if (previousSource) {
         const linked = waterLotuses.find(item => item.id === resonance.linkId);
-        linkSource.set(previousSource.x, previousSource.y + .72 * (linked ? linked.diameter / LOTUS_REFERENCE_DIAMETER : LOTUS_SCALE), previousSource.z);
+        const sourceWave = previousSource.y === 0 ? oceanHeight(previousSource.x, previousSource.z, t) : 0;
+        linkSource.set(previousSource.x, previousSource.y + sourceWave + .72 * (linked ? linked.diameter / LOTUS_REFERENCE_DIAMETER : LOTUS_SCALE), previousSource.z);
       }
       electricLink.update(t, previousSource ? (resonance.linkRole === 'taker' ? linkTarget : linkSource) : null,
         resonance.linkRole === 'taker' ? linkSource : linkTarget, resonance.linkOpacity);
@@ -245,6 +265,7 @@ export function Garden(props) {
       destinationMarker.visible = navigating && !!boatState.destination;
       if (boatState.destination) {
         destinationMarker.position.copy(boatState.destination);
+        destinationMarker.position.y = oceanHeight(boatState.destination.x, boatState.destination.z, t);
         destinationMarker.scale.setScalar(1 + Math.sin(t * 3) * .08);
       }
       if (originPower > 1e-8) {
@@ -254,8 +275,8 @@ export function Garden(props) {
       atmosphere.update(o.night, dt, t);
       // A readable underwater atmosphere for the two submerged construction levels.
       if (camera.position.y < WATER_LEVEL) { scene.fog.color.set('#092c3c'); scene.fog.density = .00065; }
-      pond.update(t, o.night, dt, opening, o.layout.lotus);
       if (controls.enabled) controls.update(dt); else if (editing) flight.update(dt, o.flightSpeed);
+      pond.update(t, o.night, dt, opening, o.layout.lotus, camera);
       guides.update(o, camera);
       renderer.info.reset(); renderer.render(scene, camera);
       updateHover(now, o);

@@ -12,8 +12,8 @@ La cámara sigue al velero en tercera persona, desde atrás y ligeramente elevad
 - **Clic derecho sobre el agua** marca un destino con anillos luminosos. El velero navega hasta él y frena al llegar. WASD cancela ese destino y devuelve el control manual.
 - **Esc** o **Detener velero** detiene la navegación. **Centrar cámara** recupera la vista desde atrás.
 - **Volver junto al loto** devuelve al personaje al punto de partida. Las posiciones de los objetos del escenario se conservan; el velero comienza junto al loto al recargar.
-- Velocidad inicial: **4 m/s**, ajustable de 0,5 a 12 m/s. El personaje permanece en la superficie y dentro del radio del mapa.
-- La carga multiplica la velocidad base por `1 + carga/capacidad`: con la base de 4 m/s, el bote navega a 4 m/s vacío, 6 m/s al 50 % y 8 m/s lleno. Conserva movimiento sin energía y acelera/frena suavemente.
+- Velocidad inicial: **4,8 m/s**, ajustable de 0,5 a 12 m/s en pasos de 0,1 m/s. El personaje permanece en la superficie y dentro del radio del mapa.
+- La carga multiplica la velocidad base por `1 + carga/capacidad`: con la base de 4,8 m/s, el bote navega a 4,8 m/s vacío, 7,2 m/s al 50 % y 9,6 m/s lleno. Conserva movimiento sin energía y acelera/frena suavemente.
 - La pausa detiene el desplazamiento, la vela, la flotación y la estela; la cámara sigue disponible.
 
 La estela deposita pinceladas inspiradas en Ōkami sobre el recorrido real. Cada marca tiene puntas afiladas, bordes de tinta oscura, fibras y cortes de pincel seco, con pigmento azul plateado bajo la luna y cálido al ocaso. Las muestras se distribuyen por distancia, siguen también los rumbos diagonales, se ensanchan y desaparecen en 6,5 segundos. Permanecen sobre el agua al alejarse el barco; volver al origen inicia un trazo nuevo. La pausa congela las marcas y su desvanecimiento. La estela, el velero y el farol comparten los reflejos del mar. El mapa de coordenadas sigue disponible en **Construir escenario**, con su cámara de vuelo libre.

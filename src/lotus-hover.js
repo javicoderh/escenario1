@@ -1,13 +1,15 @@
 import * as THREE from 'three';
+import { oceanHeight } from './ocean-waves.js';
 
 // Pick the flower's envelope, never its animated triangles. This also works
 // when a flower is represented by an instance instead of a detailed model.
-export function pickWaterLotus(ray, lotuses) {
+export function pickWaterLotus(ray, lotuses, time = null) {
   const sphere = new THREE.Sphere(), hit = new THREE.Vector3();
   let nearest = null, distance = Infinity;
   for (const lotus of lotuses) {
     if (!lotus.visible) continue;
-    sphere.center.set(lotus.x, lotus.y + lotus.diameter * .12, lotus.z);
+    const swell = time !== null && lotus.y === 0 ? oceanHeight(lotus.x, lotus.z, time) : 0;
+    sphere.center.set(lotus.x, lotus.y + swell + lotus.diameter * .12, lotus.z);
     sphere.radius = lotus.diameter * .5;
     if (!ray.intersectSphere(sphere, hit)) continue;
     const next = hit.distanceToSquared(ray.origin);

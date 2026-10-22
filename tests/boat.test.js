@@ -15,7 +15,7 @@ test('sailing supports destinations, manual override, braking and normalized dia
   stepBoat(state, { x: 1, z: 1 }, 1 / 60);
   assert.equal(state.destination, null, 'WASD overrides click movement');
   for (let i = 0; i < 300; i++) stepBoat(state, { x: 1, z: 1 }, 1 / 60);
-  assert.ok(Math.abs(state.velocity.length() - 4) < .001, 'diagonals do not exceed max speed');
+  assert.ok(Math.abs(state.velocity.length() - 4.8) < .001, 'default speed increases by 20% without a diagonal boost');
   for (let i = 0; i < 120; i++) stepBoat(state, { x: 0, z: 0 }, 1 / 60);
   assert.ok(state.velocity.length() < .001, 'releasing keys brakes the boat');
   assert.equal(state.position.y, 0, 'boat remains at sea level');

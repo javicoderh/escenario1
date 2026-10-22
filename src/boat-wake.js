@@ -1,18 +1,23 @@
 ﻿import * as THREE from 'three';
 
+import { OCEAN_GLSL } from './ocean-waves.js';
+
 export function createBoatWake() {
   const count = 256, lifetime = 6.5, spacing = .72;
-  const geometry = new THREE.PlaneGeometry(1, 1);
+  const geometry = new THREE.PlaneGeometry(1, 1, 2, 6);
   const life = new THREE.InstancedBufferAttribute(new Float32Array(count), 1);
   const seeds = new THREE.InstancedBufferAttribute(new Float32Array(count), 1);
   geometry.setAttribute('aLife', life); geometry.setAttribute('aSeed', seeds);
   const uniforms = { uTime: { value: 0 }, uSky: { value: new THREE.Color('#bad9ed') } };
   const material = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms,
-    vertexShader: `attribute float aLife; attribute float aSeed;
+    vertexShader: `attribute float aLife; attribute float aSeed; uniform float uTime;
       varying vec2 vUv; varying float vLife; varying float vSeed;
+      ${OCEAN_GLSL}
       void main() { vUv = uv; vLife = aLife; vSeed = aSeed;
-        gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }`,
+        vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
+        worldPosition.y += oceanSurface(worldPosition.xz, uTime).x;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition; }`,
     fragmentShader: `uniform float uTime; uniform vec3 uSky;
       varying vec2 vUv; varying float vLife; varying float vSeed;
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
