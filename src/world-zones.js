@@ -2,15 +2,15 @@ import { createWaterLotus, LOTUS_SIZES } from './lotus-energy.js';
 
 export const MAX_WATER_LOTUSES = 320;
 export const ZONES = [
-  { name: 'Cuna del Alba', givers: 3, target: 160, sizes: ['small', 'small-mid', 'mid'], color: '#ebc77c' },
-  { name: 'Jardín de Bruma', givers: 4, target: 280, sizes: ['small-mid', 'mid', 'small'], color: '#d4a7c5' },
-  { name: 'Bahía de Seda', givers: 5, target: 450, sizes: ['mid', 'small-mid', 'big'], color: '#a5bae6' },
-  { name: 'Mareas de Ámbar', givers: 6, target: 650, sizes: ['mid', 'big', 'small-mid'], color: '#e6a366' },
-  { name: 'Santuario Esmeralda', givers: 7, target: 900, sizes: ['big', 'mid', 'giant'], color: '#7fd2ac' },
-  { name: 'Mar de los Colosos', givers: 8, target: 1200, sizes: ['big', 'giant', 'mid'], color: '#93b9d2' },
-  { name: 'Abismo Estelar', givers: 9, target: 1600, sizes: ['giant', 'mid', 'big'], color: '#a69bdb' },
-  { name: 'Corona del Loto', givers: 10, target: 2100, sizes: ['giant', 'big', 'mid'], color: '#f0cf91' },
-].map((zone, index) => ({ ...zone, takers: 1, id: index + 1, angle: index * Math.PI / 4 }));
+  { id: 1, name: 'Cuna del Alba', givers: 3, target: 160, sizes: ['small', 'small-mid', 'mid'], color: '#ebc77c' },
+  { id: 2, name: 'Jardín de Bruma', givers: 4, target: 280, sizes: ['small-mid', 'mid', 'small'], color: '#d4a7c5' },
+  { id: 3, name: 'Bahía de Seda', givers: 5, target: 450, sizes: ['mid', 'small-mid', 'big'], color: '#a5bae6' },
+  { id: 4, name: 'Mareas de Ámbar', givers: 6, target: 650, sizes: ['mid', 'big', 'small-mid'], color: '#e6a366' },
+  { id: 5, name: 'Santuario Esmeralda', givers: 7, target: 900, sizes: ['big', 'mid', 'giant'], color: '#7fd2ac' },
+  { id: 6, name: 'Mar de los Colosos', givers: 8, target: 1200, sizes: ['big', 'giant', 'mid'], color: '#93b9d2' },
+  { id: 7, name: 'Abismo Estelar', givers: 9, target: 1600, sizes: ['giant', 'mid', 'big'], color: '#a69bdb' },
+  { id: 8, name: 'Corona del Loto', givers: 10, target: 2100, sizes: ['giant', 'big', 'mid'], color: '#f0cf91' },
+].map(zone => ({ ...zone, takers: 1, angle: (zone.id - 1) * Math.PI / 4 }));
 
 // North is -Z; each sector occupies 45 degrees clockwise from north.
 export function zoneAt({ x, z }) {

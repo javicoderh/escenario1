@@ -6,7 +6,7 @@ import { createPond, WATER_LEVEL } from './pond.js';
 import { createAtmosphere } from './atmosphere.js';
 import { createFreeCamera } from './free-camera.js';
 import { createWorldGuides, disposeMeshes } from './world-guides.js';
-import { LOTUS_SCALE } from './lotus-scale.js';
+import { LOTUS_SCALE, LOTUS_DIAMETER } from './lotus-scale.js';
 import { createSailboat } from './sailboat.js';
 import { createBoatWake } from './boat-wake.js';
 import { createSailingControls } from './sailing-controls.js';
@@ -19,6 +19,15 @@ import { chargedBoatSpeed } from './boat-motion.js';
 import { pickWaterLotus } from './lotus-hover.js';
 import { LotusTooltip } from './LotusTooltip.jsx';
 import { oceanHeight, sampleOcean } from './ocean-waves.js';
+import { createOrbVisual } from './orb-visual.js';
+import { buildWorldContent } from './world-content.js';
+import { readWorldProgress, saveWorldProgress, updateWorldProgress, visibleWorldContent, markPlace } from './world-progress.js';
+import { planCheckpointTravel } from './checkpoint-travel.js';
+import { createCheckpointVisual } from './checkpoint-visual.js';
+import { nearbyPassages } from './world-passages.js';
+import { planPassage } from './passage-travel.js';
+import { createPassageVisual, createLayerAtmosphere } from './passage-visual.js';
+import { levelName } from './world-levels.js';
 
 export function Garden(props) {
   const host = useRef(), options = useRef(props); options.current = props;
@@ -41,7 +50,15 @@ export function Garden(props) {
     controls.enableDamping = true; controls.minDistance = LOTUS_SCALE; controls.maxDistance = 4000;
     controls.maxPolarAngle = Math.PI; controls.enablePan = true;
     const flight = createFreeCamera(camera, renderer.domElement, message => options.current.onFlightStatus(message));
-    const sailing = createSailingControls(camera, renderer.domElement, options.current.layout.lotus, message => options.current.onSailingStatus(message));
+    const sailing = createSailingControls(camera, renderer.domElement, options.current.layout.lotus,
+      message => options.current.onSailingStatus(message), orb => options.current.onBoatState(previous => ({ ...previous, orb })));
+    const orbVisual = createOrbVisual(); scene.add(orbVisual.group);
+    const checkpointVisual = createCheckpointVisual(); scene.add(checkpointVisual.group);
+    const passageVisual=createPassageVisual(),layerAtmosphere=createLayerAtmosphere();scene.add(passageVisual.group,layerAtmosphere.group);
+    let exploration = readWorldProgress(), worldContent = [], migratedExploration = false, pendingDestination = null;
+    function publishExploration() {
+      options.current.onWorldProgress?.(exploration, saveWorldProgress(exploration));
+    }
     const atmosphere = createAtmosphere(scene, options.current.night);
     const pond = createPond(options.current.night); scene.add(pond.surface);
     let t = 0, lastLotusHeight = 0;
@@ -150,6 +167,44 @@ export function Garden(props) {
     props.sceneRef.current = {
       startFlight: flight.start, focusLotus, overview, goTo,
       focusBoat: () => sailing.focus(), stopBoat: sailing.stop,
+      selectOrb: () => sailing.selectOrb(), teleportToOrb: () => sailing.teleportToOrb(),
+      activateOrb: () => sailing.activateOrb(), cancelOrb: () => sailing.cancelOrb(),
+      setHelm: (x, y) => sailing.setHelm(x, y), navigateTo: point => sailing.navigateTo(point),
+      zoomBoat: factor => sailing.zoom(factor),
+      getWorldProgress: () => exploration,
+      getWorldContent: () => worldContent,
+      getNavigationState: () => ({x:sailing.state.position.x,y:sailing.state.position.y,z:sailing.state.position.z,transitioning:!!sailing.state.transit,distance:sailing.state.distance}),
+      usePassage(id) {
+        const o=options.current,position=sailing.state.position;
+        const gateId=id || nearbyPassages(worldContent,position)[0]?.id;
+        const result=planPassage(worldContent,position,gateId,waterLotuses,{paused:!o.playing||o.suspended||!o.navigating||document.hidden||contextLost,transitioning:!!sailing.state.transit});
+        if(!result.allowed){o.onSailingStatus(result.reason);return result;}
+        pendingDestination=null;exploration=markPlace(exploration,result.gate.id,'visited');publishExploration();
+        sailing.transitionTo(result.landing);o.onSailingStatus(`${result.gate.type==='cyclone'?'Corriente de viento':'Corriente marina'} · hacia ${levelName(result.landing.y)}`);
+        return {allowed:true};
+      },
+      requestMapDestination(point) {
+        if (!options.current.navigating || !options.current.playing || options.current.infoOpen || contextLost) return false;
+        if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z) || Math.hypot(point.x, point.z) > 997.5) return false;
+        if (sailing.state.transit || (point.y ?? sailing.state.position.y)!==sailing.state.position.y) return false;
+        if (point.id && !visibleWorldContent(exploration, worldContent).some(item => item.id === point.id)) return false;
+        pendingDestination = { x: point.x, y:sailing.state.position.y, z: point.z }; return true;
+      },
+      travelToCheckpoint(id) {
+        const o = options.current;
+        const travel = planCheckpointTravel(exploration, worldContent, sailing.state.position, id, waterLotuses,
+          { paused: !o.playing || !o.navigating || o.infoOpen || contextLost || document.hidden,
+            inCombat: !!sailing.state.inCombat });
+        if (!travel.allowed) return travel;
+        pendingDestination = null; sailing.transferTo(travel.landing);
+        exploration = { ...exploration, lastCheckpoint: id }; publishExploration(); saveEnergy();
+        o.onBoatState(previous => ({ ...previous, x: travel.landing.x, y:travel.landing.y, levelY:travel.landing.y, z: travel.landing.z, speed: 0,
+          destination: null, orb: sailing.orb.snapshot() }));
+        o.onSailingStatus(`Llegada a ${travel.destination.name} · checkpoint activado`);
+        pond.invalidate(); return { allowed: true };
+      },
+      getOrbState: () => sailing.orb.snapshot(),
+      getCameraState: () => sailing.getCameraState(),
       returnBoat: () => { sailing.returnToLotus(options.current.layout.lotus); pond.invalidate(); },
       resetView: () => options.current.navigating ? sailing.focus() : focusLotus(),
       getPerformance: () => ({ fps: measuredFps, pixelRatio: renderer.getPixelRatio(), detailedLotuses: field.detailedCount,
@@ -189,7 +244,8 @@ export function Garden(props) {
       }
       controls.enabled = !editing && !navigating && !o.suspended;
       flight.setEnabled(editing && !o.suspended);
-      sailing.setEnabled(navigating && !o.suspended);
+      sailing.setEnabled(navigating && !o.suspended, { preserveMovement: o.mapOpen });
+      if (!navigating) sailing.orb.dismiss();
       const desiredDetail = navigating || editing ? 'medium' : 'high';
       if (desiredDetail !== originDetail) {
         lotus.dispose(); disposeMeshes(lotus.group); lotusAnchor.remove(lotus.group); originDetail = desiredDetail;
@@ -219,7 +275,7 @@ export function Garden(props) {
       lastLotusHeight = lotusWater.height;
       lotusAnchor.visible = o.layout.lotus.visible && camera.position.distanceToSquared(lotusAnchor.position) < 10000;
       if (energyLayout !== o.layout) {
-        const definitions = [{ ...createWaterLotus({ ...o.layout.lotus, id: 'water-lotus', name: 'Loto de origen', palette: currentPalette }), y: o.layout.lotus.y }, ...(o.layout.lotuses || [])];
+        const definitions = [{ ...createWaterLotus({ ...o.layout.lotus, id: 'water-lotus', name: 'Loto de origen', palette: currentPalette, diameter: LOTUS_DIAMETER }), y: o.layout.lotus.y }, ...(o.layout.lotuses || [])];
         const previous = new Map(waterLotuses.map(item => [item.id, item]));
         waterLotuses = definitions.map(definition => {
           const signature = JSON.stringify(definition);
@@ -229,14 +285,34 @@ export function Garden(props) {
         });
         fieldLotuses = waterLotuses;
         energyLayout = o.layout;
+        worldContent = buildWorldContent(o.layout); o.onWorldContent?.(worldContent);
+        if (!migratedExploration) {
+          // Backfill old completed lotuses without replaying their celebrations.
+          exploration = updateWorldProgress(exploration, worldContent, waterLotuses, null, false).progress;
+          migratedExploration = true; publishExploration();
+        }
       }
       const effectiveSpeed = chargedBoatSpeed(o.boatSpeed, resonance.energy / boatStats(resonance).capacity);
-      sailing.update(dt, effectiveSpeed, o.playing && !o.suspended);
+      sailing.update(dt, effectiveSpeed, o.playing && !o.suspended, waterLotuses, Math.max(0, elapsed));
+      if (!navigating) pendingDestination = null;
+      if (pendingDestination && navigating && !o.suspended && o.playing && sailing.navigateTo(pendingDestination)) pendingDestination = null;
+      orbVisual.update(sailing.orb.state, t, navigating, sailing.state.position);
       const boatState = sailing.state;
       boat.group.position.x = boatState.position.x; boat.group.position.z = boatState.position.z;
       boat.group.rotation.y = boatState.heading;
       const activeSeconds = o.playing && !o.suspended ? Math.max(0, elapsed) : 0;
       stepEnergy(resonance, waterLotuses, boatState.position, activeSeconds);
+      if (navigating && activeSeconds > 0 && !boatState.transit) {
+        const result = updateWorldProgress(exploration, worldContent, waterLotuses, boatState.position);
+        if (result.progress !== exploration) {
+          exploration = result.progress; publishExploration();
+          if (result.unlocked.length) { saveEnergy(); o.onZoneUnlocked?.(result.unlocked); }
+        }
+      }
+      checkpointVisual.update(exploration, worldContent, t, navigating);
+      const layerY=boatState.transit?boatState.transit.from.y:boatState.position.y;
+      passageVisual.update(worldContent,boatState.position,t,navigating||editing,editing?o.selection.y:layerY);
+      layerAtmosphere.update(boatState.position,t,navigating);
       const stats = boatStats(resonance), charge = resonance.energy / stats.capacity;
       const originPower = waterLotuses[0].energy / waterLotuses[0].capacity;
       originLight.position.copy(lotusAnchor.position); originLight.position.y += .9 * LOTUS_SCALE;
@@ -248,7 +324,7 @@ export function Garden(props) {
       field.update(fieldLotuses, camera, t, now, detailBudget, lotusAnchor.visible ? 'water-lotus' : null);
       const targetScale = stats.scale;
       deckLotus.group.scale.setScalar(THREE.MathUtils.damp(deckLotus.group.scale.x, targetScale, 3, dt));
-      deckLotus.update(t, charge); boat.setEnergy(charge); boat.update(t, boatState.velocity.length(), simulationDt);
+      deckLotus.update(t, charge); boat.setEnergy(charge); boat.update(t, boatState.velocity.length(), simulationDt,boatState.position.y);
       sailing.setSurfaceHeight(boat.group.position.y);
       deckLotus.getLinkPosition(linkTarget);
       const previousSource = resonance.linkPosition;
@@ -261,11 +337,11 @@ export function Garden(props) {
         resonance.linkRole === 'taker' ? linkSource : linkTarget, resonance.linkOpacity);
       saveElapsed += activeSeconds;
       if (saveElapsed >= 5) { saveEnergy(); saveElapsed = 0; }
-      wake.update(o.playing && !o.suspended ? dt : 0, t, boatState, o.night, navigating && !o.suspended && o.playing);
+      wake.update(o.playing && !o.suspended ? dt : 0, t, boatState, o.night, navigating && !o.suspended && o.playing && boatState.position.y===0 && !boatState.transit);
       destinationMarker.visible = navigating && !!boatState.destination;
       if (boatState.destination) {
         destinationMarker.position.copy(boatState.destination);
-        destinationMarker.position.y = oceanHeight(boatState.destination.x, boatState.destination.z, t);
+        destinationMarker.position.y = boatState.position.y+(boatState.position.y===0?oceanHeight(boatState.destination.x, boatState.destination.z, t):.1);
         destinationMarker.scale.setScalar(1 + Math.sin(t * 3) * .08);
       }
       if (originPower > 1e-8) {
@@ -274,23 +350,27 @@ export function Garden(props) {
       }
       atmosphere.update(o.night, dt, t);
       // A readable underwater atmosphere for the two submerged construction levels.
-      if (camera.position.y < WATER_LEVEL) { scene.fog.color.set('#092c3c'); scene.fog.density = .00065; }
+      if (camera.position.y < WATER_LEVEL) { scene.fog.color.set('#092c3c'); scene.fog.density = navigating ? .009 : .00065; }
       if (controls.enabled) controls.update(dt); else if (editing) flight.update(dt, o.flightSpeed);
       pond.update(t, o.night, dt, opening, o.layout.lotus, camera);
       guides.update(o, camera);
       renderer.info.reset(); renderer.render(scene, camera);
-      updateHover(now, o);
+      if(!navigating || boatState.position.y===0)updateHover(now, o);else if(hoverKey)clearHover();
       if (now - lastHud > 250) {
         if (editing) o.onCameraPosition({ x: camera.position.x, y: camera.position.y, z: camera.position.z }); lastHud = now;
-        if (navigating) o.onBoatState({ x: boatState.position.x, z: boatState.position.z, heading: boatState.heading,
+        if (navigating) o.onBoatState({ x: boatState.position.x, y:boatState.position.y, levelY:layerY, z: boatState.position.z, heading: boatState.heading,
+          transition:boatState.transit?{from:boatState.transit.from.y,to:boatState.transit.to.y,progress:boatState.transit.elapsed/boatState.transit.duration}:null,
+          passages:boatState.transit?[]:nearbyPassages(worldContent,boatState.position),
           speed: o.playing && navigating ? boatState.velocity.length() : 0, distance: boatState.distance, maxSpeed: effectiveSpeed,
+          orb: sailing.orb.snapshot(),
           energy: { charge, units: resonance.energy, capacity: stats.capacity, level: resonance.level,
             delivered: resonance.delivered, restored: resonance.restored, nextThreshold: BOAT_LEVELS[resonance.level]?.threshold,
             connected: !!resonance.linkId, role: resonance.linkRole, name: resonance.linkName,
             secondsRemaining: resonance.energy / (stats.capacity/stats.autonomy), autonomy: stats.autonomy,
             lotuses: waterLotuses.map(item => ({ id: item.id, name: item.name, energyRole: item.energyRole,
-              energy: item.energy, capacity: item.capacity, x: item.x, z: item.z, size: item.size })) },
-          destination: boatState.destination ? { x: boatState.destination.x, z: boatState.destination.z } : null });
+              energy: item.energy, capacity: item.capacity, x: item.x, y: item.y, z: item.z, size: item.size,
+              visible: item.visible, diameter: item.diameter })) },
+          destination: boatState.destination ? { x: boatState.destination.x,y:boatState.destination.y, z: boatState.destination.z } : null });
       }
       if (elapsed > 0) { sampleTime += Math.min(elapsed, 1); sampleFrames++; }
       if (sampleTime >= 2) {
@@ -307,7 +387,7 @@ export function Garden(props) {
     return () => {
       saveEnergy();
       window.removeEventListener('pagehide', saveEnergy);
-      field.dispose(); scene.remove(field.group);
+      field.dispose(); scene.remove(field.group);passageVisual.dispose();scene.remove(passageVisual.group);
       cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', resetTiming);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);

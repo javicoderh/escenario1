@@ -1,0 +1,28 @@
+# Orden de trabajo acordado · 26 de octubre de 2026
+
+1. Sprint 1 IMPLEMENTADO: mapa de las ocho zonas, catálogo de lugares, descubrimiento, premios de grandes lotos y red de checkpoints con viaje rápido persistente.
+   Plan detallado: PLAN_SPRINT_1_MAPA_Y_LOTOS.md.
+2. Sprint siguiente: isla tutorial en zona 1 (Cuna del Alba), diseñada para enseñar el ciclo de energía, mapa y checkpoints.
+   Ampliación previa IMPLEMENTADA: ciclones y remolinos de ida y vuelta entre las cinco cotas, navegación del velero en cada nivel, revelado de accesos por el gran loto y cartografía progresiva guardada por nivel. Personaje fuera del velero todavía pendiente.
+3. Después: combate estilo Dota en mundo abierto; el orbe hace daño además de servir para movilidad. Desarrollar personaje, enemigos, habilidades y progresión por etapas.
+4. Ampliar contenido: islas, dungeons, hunting zones, quests, tesoros, cielo, objetos y lore.
+
+Orden permanente de zonas: 1 Cuna del Alba; 2 Jardín de Bruma; 3 Bahía de Seda; 4 Mareas de Ámbar; 5 Santuario Esmeralda; 6 Mar de los Colosos; 7 Abismo Estelar; 8 Corona del Loto.
+
+## Ideas originales conservadas
+
+-crear isla en zona 1
+-crear pj fuera del velero con sistema de lvl skills y atributos (str, agi, int) con la logica clasica int da mana, mana rege y daño, agi da daño y velocidad de ataque, str da vida rege de vida y daño (el daño extra se considera desde el atributo mas alto agi, str o int)
+-incorporar remolinos para subir nivel cielo 1 con pj sin velero
+-crear sistema de mapa
+-incorporar logica de los gran lotos cargados se convierten en checkpoints y desblokean islas en el mapa, otros dan algun skill.
+-crear sistema de batalla estilo wow con clicks y hotkeys, misma logica de dota y wow
+-crear algunos prototipos de enemigos para las islas (mono, dragon, humanoide, goblin), el personaje en el cielo y velero en el agua
+-crear ataque base y skills de batalla del velero con logica de lvls que mejoran los skills disponibles y da puntos para subir nivel de skills a gusto
+
+
+
+Trama/progresión
+
+crear nombre, historia y lore para cada zona con sus respectivos hooks para hacer mas atractiva la jugabilidad
+desarrollar sistema de items para el pj y el velero, con niveles de rareza, efectos y skills.

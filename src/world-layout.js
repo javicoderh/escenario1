@@ -1,14 +1,10 @@
 import { createWaterLotus } from './lotus-energy.js';
 import { seedWorld, MAX_WATER_LOTUSES } from './world-zones.js';
+import { parseWorldContent } from './world-content.js';
 export const WORLD_RADIUS = 1000;
 export const GRID_STEP = 25;
-export const LEVELS = [
-  { id: -2, y: -30, label: 'Submarino 2', color: '#648fe3' },
-  { id: -1, y: -15, label: 'Submarino 1', color: '#65bfd8' },
-  { id: 0, y: 0, label: 'Nivel del mar', color: '#a8d7b0' },
-  { id: 1, y: 15, label: 'Elevado 1', color: '#ebcf8a' },
-  { id: 2, y: 30, label: 'Elevado 2', color: '#e9a88d' },
-];
+import { WORLD_LEVELS as LEVELS } from './world-levels.js';
+export { LEVELS };
 export const STORAGE_KEY = 'flamming-lottus-world-v1';
 
 export function isValidPosition(position) {
@@ -19,7 +15,7 @@ export function isValidPosition(position) {
 
 export function emptyLayout() {
   return { version: 1, radius: WORLD_RADIUS, units: 'meters', levels: LEVELS.map(level => level.y),
-    lotus: { x: 0, y: 0, z: 0, visible: false }, lotuses: [], markers: [] };
+    lotus: { x: 22, y: 0, z: -65, visible: false }, lotuses: [], markers: [], pointsOfInterest: [] };
 }
 
 export function parseLayout(value) {
@@ -31,6 +27,7 @@ export function parseLayout(value) {
     lotusIds.add(item.id); return true;
   }).slice(0, MAX_WATER_LOTUSES).map(createWaterLotus);
   return { ...emptyLayout(), ...([1,2].includes(value.zonesVersion) ? { zonesVersion: value.zonesVersion } : {}), lotuses, lotus: { ...value.lotus, visible: value.lotus.visible === true },
+    pointsOfInterest: parseWorldContent(value.pointsOfInterest),
     markers: value.markers.filter(marker => {
       if (!isValidPosition(marker) || typeof marker.id !== 'string' || ids.has(marker.id)) return false;
       ids.add(marker.id);

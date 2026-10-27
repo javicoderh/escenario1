@@ -180,10 +180,11 @@ export function createSailboat(renderer, palette = 'ember', { textureCache } = {
       crestMaterial.emissiveIntensity = .2 + power * .65;
       lanternLight.intensity = .25 + power * .55;
     },
-    update(time, speed, dt = previousTime === null ? 0 : Math.max(0, time - previousTime)) {
+    update(time, speed, dt = previousTime === null ? 0 : Math.max(0, time - previousTime), levelY=0) {
       timeUniform.value = time; electricity.update(time);
       const pose = buoyancy.update(group.position, group.rotation.y, time, dt, speed);
-      group.position.y = pose.height; group.rotation.x = pose.pitch; group.rotation.z = pose.roll;
+      group.position.y = levelY===0 ? pose.height : levelY+.15+Math.sin(time*.8)*.08;
+      group.rotation.x = pose.pitch*(levelY===0?1:.2); group.rotation.z = pose.roll*(levelY===0?1:.2);
       previousTime = time;
       const positions = sailGeometry.attributes.position;
       for (let i = 0; i < positions.count; i++) {

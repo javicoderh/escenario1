@@ -36,7 +36,7 @@ export function stepEnergy(state, lotuses, position, seconds) {
   let remaining = seconds;
   while (remaining > 1e-9) {
     const dt = Math.min(remaining, .05); remaining -= dt;
-    const eligible = lotus => lotus.visible && lotus.y === 0 && Math.hypot(lotus.x-position.x, lotus.z-position.z) <= lotus.range
+    const eligible = lotus => lotus.visible && lotus.y === 0 && (position.y ?? 0) === 0 && Math.hypot(lotus.x-position.x, lotus.z-position.z) <= lotus.range
       && (lotus.energyRole === 'giver' ? lotus.energy > 1e-8
         : lotus.energy < lotus.capacity - 1e-8 && state.energy > 1e-8);
     const stats = boatStats(state);

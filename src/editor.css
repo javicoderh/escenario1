@@ -127,3 +127,71 @@
 .zone-entry{position:absolute;top:23%;left:50%;transform:translateX(-50%);z-index:4;width:90%;text-align:center;pointer-events:none;text-shadow:0 2px 12px #071418,0 0 35px #071418;animation:zone-arrival 3.4s ease both}.zone-entry span{display:block;font-size:10px;letter-spacing:5px;color:#d4dcb6}.zone-entry strong{display:block;font:400 clamp(26px,4vw,45px) 'Playfair Display',Georgia,serif;color:#f0e9c6;margin:10px 0}.zone-entry small{font-size:10px;letter-spacing:1px;color:#c3d6bb}.zone-mission{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #b2bd9655;background:#172d2b;border-radius:7px;margin:15px 0}.zone-mission>span{font-size:8px;letter-spacing:1.5px;color:#bdc99f}.zone-mission strong{font-size:12px}.zone-mission small{font-size:10px;color:#a9c3b2}.zone-mission.complete{border-color:#e0c377;background:#354031}
 @keyframes zone-arrival{0%{opacity:0;transform:translate(-50%,8px)}15%,80%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-5px)}}
 @media(prefers-reduced-motion:reduce){.zone-entry{animation:none}}
+
+.navigation-dock{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);z-index:4;width:min(360px,calc(100% - 36px));display:flex;flex-direction:column;gap:12px;pointer-events:none}
+.navigation-dock .energy-hud{position:static;transform:none;width:100%;box-sizing:border-box}
+.orb-hud{display:flex;align-items:center;gap:16px;min-height:84px;padding:0 8px;color:#d8eff1;pointer-events:none}
+.orb-actions{display:flex;gap:14px;flex-shrink:0;pointer-events:auto}
+.orb-slot{position:relative;width:48px;height:48px}
+.orb-skill{display:block;position:relative;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:transparent}
+.orb-skill-art{position:absolute;inset:0;display:block;border:1px solid #a0cfff88;border-radius:50%;background:radial-gradient(circle,#34366b,#101326 72%);box-shadow:0 0 0 3px #151d32,0 0 0 4px #92b8ee30,0 0 20px #8870ff40,0 4px 12px #0009;overflow:hidden;transition:box-shadow .2s,border-color .2s}
+.orb-jaunt .orb-skill-art{background:radial-gradient(circle,#65448e,#19122e 72%);border-color:#c8a7ff}
+.orb-skill-icon{display:block;width:100%;height:100%;overflow:visible}
+.orb-icon-mist{transform-origin:32px 32px;animation:orb-mist-turn 14s linear infinite}
+.orb-icon-core{transform-origin:30px 30px;animation:orb-core-glow 3s ease-in-out infinite alternate}
+@keyframes orb-mist-turn{to{transform:rotate(360deg)}}
+@keyframes orb-core-glow{to{opacity:.72;transform:scale(.88)}}
+.orb-paused .orb-icon-mist,.orb-paused .orb-icon-core,.orb-cooling .orb-icon-mist,.orb-cooling .orb-icon-core{animation-play-state:paused}
+@media(prefers-reduced-motion:reduce){.orb-icon-mist,.orb-icon-core{animation:none}}
+.orb-skill kbd{position:absolute;left:-1px;top:-1px;z-index:2;padding:2px 4px;border:1px solid #d9efff66;border-radius:3px;color:#effbff;background:#071423ed;font:9px ui-monospace,monospace}
+.orb-skill[aria-disabled=true]{cursor:default}
+.orb-jaunt[aria-disabled=true] .orb-skill-art{filter:saturate(.3);opacity:.55}
+.orb-skill:hover .orb-skill-art,.orb-skill[aria-pressed=true] .orb-skill-art{border-color:#e0ffff;box-shadow:0 0 0 3px #274568,0 0 0 4px #a6efffaa,0 0 22px #82e4ff88}
+.orb-skill:focus-visible{outline:2px solid #ddffff;outline-offset:7px}
+.orb-in-flight .orb-jaunt .orb-skill-art{border-color:#dbceff;box-shadow:0 0 16px #ab7dff77,inset 0 0 18px #e6d3ff33}
+.orb-tooltip{position:absolute;left:-4px;bottom:calc(100% + 14px);display:flex;flex-direction:column;gap:6px;width:204px;padding:12px;background:#0c202df5;border:1px solid #83cfe366;border-radius:8px;box-shadow:0 4px 20px #0005;color:#c5dae5;font-size:10px;line-height:1.5;visibility:hidden;opacity:0;pointer-events:none}
+.orb-tooltip strong{color:#e2faff;font-size:12px}
+.orb-slot:hover .orb-tooltip,.orb-slot:focus-within .orb-tooltip{visibility:visible;opacity:1}
+.orb-life-ring{position:absolute;inset:-6px;width:60px;height:60px;fill:none;stroke-width:3;pointer-events:none}
+.orb-life-track{stroke:#162f43}
+.orb-life-value{stroke:#bceaff;stroke-linecap:round;filter:drop-shadow(0 0 2px #7edaff)}
+.orb-urgent .orb-life-value{stroke:#ff9eac}
+.orb-urgent .orb-jaunt .orb-skill-art{border-color:#ffa7c8;box-shadow:0 0 18px #ff80c088}
+.orb-cooldown-fill{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(#e754779c,#711b4bbf);border-top:1px solid #ffb6d1;pointer-events:none;transition:height .2s linear}
+.orb-cooldown-meter{position:absolute;inset:0;pointer-events:none}
+.orb-timer{position:absolute;left:50%;top:-19px;transform:translateX(-50%);padding:2px 5px;border-radius:4px;background:#091b2bee;color:#ddf5ff;font:10px ui-monospace,monospace;white-space:nowrap;pointer-events:none}
+.orb-action-name{position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);font-size:10px;color:#e5f4ff;text-shadow:0 1px 5px #000;white-space:nowrap}
+.orb-cancel{width:48px;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:#25212de8;border:1px solid #e6a0a650;border-radius:9px;color:#f1c4cd;touch-action:manipulation}
+.orb-cancel>span{font-size:23px;line-height:1}.orb-cancel small{font-size:8px}
+.orb-actions button{touch-action:manipulation}
+.orb-timer.cooling{color:#ffc3ca}
+.orb-readout{flex:1;min-width:0;padding:9px 10px;background:linear-gradient(120deg,#142638ed,#1c1b37ed);border:1px solid #9ab8ea30;border-radius:10px;box-shadow:inset 0 1px #c8ddff0a,0 4px 15px #030c181f}
+.orb-title{display:block;color:#e0eaff;font-size:11px;font-weight:500;letter-spacing:.3px;margin-bottom:3px}
+.orb-aiming .orb-title{color:#a8f5ff}.orb-in-flight .orb-title{color:#dac2ff}
+.orb-status{display:block;color:#c9e2ed;font-size:9px;line-height:1.5;margin-bottom:7px}
+.orb-sensor{display:flex;align-items:center;gap:6px;font-size:9px;color:#a9cbdb}
+.orb-sensor+.orb-sensor{margin-top:7px}
+.orb-sensor>span{width:30px;flex-shrink:0}
+.orb-sensor small{width:52px;flex-shrink:0;text-align:right;font-size:8px;color:#b5d3ce}
+.orb-sense{display:flex;flex:1;gap:2px;height:5px}
+.orb-sense i{flex:1;background:#284651;border-radius:1px}
+.orb-sense i.lit{background:#a2ffd0;box-shadow:0 0 6px #85ffd055}
+.navigation-mode .flight-help{bottom:244px}
+@media(max-width:760px){.orb-hud{gap:12px;padding:0 5px}.orb-actions{gap:12px}.orb-readout{padding:8px}.orb-status{font-size:8px}.orb-sensor{gap:4px}.navigation-mode .flight-help{bottom:240px}}
+@media(max-width:360px){.navigation-dock{width:calc(100% - 20px)}.orb-hud{gap:8px}.orb-actions{gap:10px}.orb-sensor small{width:44px;font-size:7px}}
+.touch-navigation{display:none;position:absolute;inset:0;z-index:5;pointer-events:none}
+.touch-helm-wrap{position:absolute;left:18px;bottom:230px;text-align:center}
+.touch-helm-wrap>span{display:block;margin-top:7px;font-size:9px;color:#c4dcd4;text-shadow:0 1px 5px #000}
+.touch-helm{position:relative;width:96px;height:96px;border-radius:50%;border:1px solid #bbebd46b;background:#0c262b99;box-shadow:inset 0 0 20px #8ef7d110;touch-action:none;pointer-events:auto;user-select:none}
+.touch-helm[aria-disabled=true]{opacity:.4}
+.touch-helm-cross{position:absolute;inset:0;display:grid;place-items:center;font-size:70px;color:#b5e5d02b}
+.touch-helm-stick{position:absolute;width:40px;height:40px;left:28px;top:28px;border-radius:50%;border:1px solid #ceffe6;background:radial-gradient(#699a8e,#274b49);box-shadow:0 3px 12px #0005;pointer-events:none}
+.touch-boat-actions{position:absolute;right:18px;bottom:230px;display:grid;grid-template-columns:repeat(2,48px);gap:8px;pointer-events:auto}
+.touch-boat-actions button{min-height:46px;padding:5px;border:1px solid #accfc44d;border-radius:9px;background:#102c31df;color:#d3e8dc;font-size:20px;touch-action:manipulation}
+.touch-boat-actions button span{display:block;font-size:8px;margin-top:2px}
+.touch-only{display:none}
+@media(pointer:coarse),(max-width:760px){.touch-navigation,.touch-only{display:block}.desktop-only{display:none}.navigation-mode .flight-help{bottom:354px;font-size:10px}.navigation-mode .viewer-tools button{width:44px;height:44px}.orb-tooltip{display:none}.sailing-instructions{font-size:11px}.mode-switch button{min-height:44px}.editor-actions button{min-height:44px}}
+@media(max-height:520px) and (pointer:coarse){.navigation-mode .viewer:fullscreen{min-height:0}.viewer:fullscreen .touch-helm-wrap,.viewer:fullscreen .touch-boat-actions{bottom:20px}.viewer:fullscreen .navigation-dock{width:min(360px,calc(100% - 280px));bottom:10px;gap:4px}.viewer:fullscreen .energy-hud{padding:8px}.viewer:fullscreen .energy-hud>span,.viewer:fullscreen .energy-hud small,.viewer:fullscreen .sailing-hud p{display:none}.viewer:fullscreen .orb-hud{justify-content:center;min-height:84px}.viewer:fullscreen .flight-help{bottom:auto;top:58px;left:160px;right:160px}}
+@media(max-width:760px){.navigation-mode .zone-entry{left:auto;right:14px;top:55px;width:58%;text-align:right;transform:none;animation:zone-arrival-mobile 3.4s ease both}.navigation-mode .zone-entry span{font-size:8px;letter-spacing:3px}.navigation-mode .zone-entry strong{font-size:24px;margin:8px 0}.navigation-mode .zone-entry small{font-size:8px;letter-spacing:0}}
+@keyframes zone-arrival-mobile{0%{opacity:0;transform:translateY(8px)}15%,80%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-5px)}}
+@media(prefers-reduced-motion:reduce){.navigation-mode .zone-entry{animation:none}}
